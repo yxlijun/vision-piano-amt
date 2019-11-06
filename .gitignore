@@ -1,0 +1,8 @@
+*.pyc
+*.pth
+*.swp
+*.swc
+*.swo
+weights/
+saved/
+test_imgs/
