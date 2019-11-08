@@ -73,9 +73,9 @@ class BaseDataSet(Dataset):
             h, w = (longside, int(1.0 * longside * w / h + 0.5)) if h > w else (int(1.0 * longside * h / w + 0.5), longside)
             image = cv2.resize(image, (w, h), interpolation=cv2.INTER_LINEAR)
             label = cv2.resize(label, (w, h), interpolation=cv2.INTER_NEAREST)
-       
+         
         while True: # The rotated crop must have some objects
-            image_new, label_new = image, label
+            image_new, label_new = image.copy(), label.copy()
             h, w, _ = image_new.shape
             # Rotate the image with an angle between -10 and 10
             if self.rotate:
@@ -136,7 +136,6 @@ class BaseDataSet(Dataset):
             image, label = self._val_augmentation(image, label)
         elif self.augment:
             image, label = self._augmentation(image, label)
-
         label = torch.from_numpy(np.array(label, dtype=np.int32)).long()
         image = Image.fromarray(np.uint8(image))
         if self.return_id:

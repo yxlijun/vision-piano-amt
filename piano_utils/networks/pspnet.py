@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn.functional as F
 from torch import nn
-from keyboard_model import resnet
+from networks import resnet
 from torchvision import models
 from base import BaseModel
 from itertools import chain
@@ -53,7 +53,7 @@ class _PSPModule(nn.Module):
 
 
 class PSPNet(BaseModel):
-    def __init__(self, num_classes, in_channels=3, backbone='resnet152', pretrained=False, use_aux=True, freeze_bn=False, freeze_backbone=False):
+    def __init__(self, num_classes, in_channels=3, backbone='resnet50', pretrained=False, use_aux=True, freeze_bn=False, freeze_backbone=False):
         super(PSPNet, self).__init__()
         # TODO: Use synch batchnorm
         norm_layer = nn.BatchNorm2d
@@ -98,12 +98,12 @@ class PSPNet(BaseModel):
         x = self.layer4(x_aux)
 
         output = self.master_branch(x)
-        output = F.interpolate(output, size=input_size, mode='bilinear')
+        output = F.interpolate(output, size=input_size, mode='bilinear',align_corners=False)
         output = output[:, :, :input_size[0], :input_size[1]]
 
         if self.training and self.use_aux:
             aux = self.auxiliary_branch(x_aux)
-            aux = F.interpolate(aux, size=input_size, mode='bilinear')
+            aux = F.interpolate(aux, size=input_size, mode='bilinear',align_corners=False)
             aux = aux[:, :, :input_size[0], :input_size[1]]
             return output, aux
         return output

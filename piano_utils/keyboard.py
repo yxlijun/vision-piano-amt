@@ -15,34 +15,24 @@ from PIL import Image
 import sys 
 sys.path.insert(0,os.path.abspath(__file__))
 
-import dataloaders
-import keyboard_model as models
+from networks import PSPNet
 from config import cfg 
+from util import colorize_mask
 
-def colorize_mask(mask, palette):
-    zero_pad = 256 * 3 - len(palette)
-    for i in range(zero_pad):
-        palette.append(0)
-    new_mask = Image.fromarray(mask.astype(np.uint8)).convert('P')
-    new_mask.putpalette(palette)
-    return new_mask
     
 class KeyBoard(object):
     """docstring for KeyBoard"""
     def __init__(self):
         super(KeyBoard, self).__init__()
         self.load_keyboard_model()
-
+        print('->>finish keyborad model load')
     def load_keyboard_model(self):
-        config = json.load(open(cfg.KEYBOARD_JSON))
-        dataset_type = config['train_loader']['type']
-        loader = getattr(dataloaders, config['train_loader']['type'])(**config['train_loader']['args'])
         self.to_tensor = transforms.ToTensor()
-        self.normalize = transforms.Normalize(loader.MEAN, loader.STD)
-        self.num_classes = loader.dataset.num_classes
-        self.palette = loader.dataset.palette
+        self.normalize = transforms.Normalize(cfg.MEAN, cfg.STD)
+        self.num_classes = cfg.KEYBOARD_NUM_CLASSES
+        self.palette = cfg.KEYBOARD_PALETTE
 
-        self.model = getattr(models, config['arch']['type'])(self.num_classes, **config['arch']['args'])
+        self.model = PSPNet(num_classes=self.num_classes)
         availble_gpus = list(range(torch.cuda.device_count()))
         self.device = torch.device('cuda:0' if len(availble_gpus) > 0 else 'cpu')
 
@@ -54,6 +44,7 @@ class KeyBoard(object):
         self.model.load_state_dict(checkpoint)
         self.model.to(self.device)
         self.model.eval()
+
 
     def detect_keyboard(self,img):
         with torch.no_grad():

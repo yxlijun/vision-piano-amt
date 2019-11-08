@@ -22,19 +22,31 @@ _C.TOP_K = 750
 _C.CONF_THRESH = 0.05
 _C.NUM_CLASSES = 5 
 _C.VIS_THRESH = 0.7
+
 # pretained model config
 _C.HAND_MODEL = os.path.join(PROJECT_ROOT,'weights','det_hand.pth')
-_C.KEY_PRESS_MODEL = os.path.join(PROJECT_ROOT,'weights','key_press.pth')
+_C.KEY_WHITE_MODEL = os.path.join(PROJECT_ROOT,'weights','white_key.pth')
+_C.KEY_BLACK_MODEL = os.path.join(PROJECT_ROOT,'weights','black_key.pth')
+
+_C.MEAN = [0.45734706, 0.43338275, 0.40058118]
+_C.STD = [0.23965294, 0.23532275, 0.2398498]
 
 ## key_config 
 _C.KEY_NUM_CLASSES = 2 
-_C.KEY_THRESH = 0.5
+_C.WHITE_KEY_THRESH = 0.5
+_C.BLACK_KEY_THRESH = 0.5
+_C.NEAR_KEY_THRESH = 0.8 
 
 ##keyboard config 
-_C.KEYBOARD_JSON = os.path.join(PROJECT_ROOT,'piano_utils','config_piano.json')
 _C.KEYBOARD_MODEL = os.path.join(PROJECT_ROOT,'weights','keyboard.pth')
+_C.KEYBOARD_PALETTE = [0,0,0,64,0,128]
+_C.KEYBOARD_NUM_CLASSES = 2
 
 ## save file config 
 _C.SAVE_IMG_DIR = os.path.join(PROJECT_ROOT,'saved')
 
+## hand segment 
+_C.HAND_SEG_MODEL = os.path.join(PROJECT_ROOT,'weights','seg_hand.pth')
+_C.HAND_SEG_PALETTE = [0,0,0,64,0,128]
+_C.HAND_SEG_NUM_CLASSES = 2
 

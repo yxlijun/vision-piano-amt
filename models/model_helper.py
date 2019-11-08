@@ -30,8 +30,18 @@ def to_chw_bgr(image):
 class ModelProduct(object):
     def __init__(self):
         self.load_det_hand_model() 
-        self.load_key_model()
+        self.load_white_key_model()
+        self.load_black_key_model()
+        print('->>finish det hand model load')
+        print('->>finish whitekey model load')
+        print('->>finish blackkey model load')
 
+
+        self.transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+        
     def load_det_hand_model(self):
         self.hand_net = build_s3fd('test',cfg.NUM_CLASSES)
         self.hand_net.load_state_dict(torch.load(cfg.HAND_MODEL))
@@ -40,32 +50,51 @@ class ModelProduct(object):
             self.hand_net.cuda()
         cudnn.benchmark = True 
 
-    def load_key_model(self):
-        self.key_net = ResNet18(num_classes=cfg.KEY_NUM_CLASSES)
-        self.key_net.load_state_dict(torch.load(cfg.KEY_PRESS_MODEL))
-        self.key_net.eval()
+    def load_white_key_model(self):
+        self.white_key_net = ResNet18(num_classes=cfg.KEY_NUM_CLASSES)
+        self.white_key_net.load_state_dict(torch.load(cfg.KEY_WHITE_MODEL))
+        self.white_key_net.eval()
         if torch.cuda.is_available():
-            self.key_net.cuda()
+            self.white_key_net.cuda()
 
-    def detect_keys(self,img):
-        #img = img.convert('P')
-        assert img is not None,'img is None'
-        transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    def load_black_key_model(self):
+        self.black_key_net = ResNet18(num_classes = cfg.KEY_NUM_CLASSES)
+        self.black_key_net.load_state_dict(torch.load(cfg.KEY_BLACK_MODEL))
+        self.black_key_net.eval()
+        if torch.cuda.is_available():
+            self.black_key_net.cuda()
+
+    def detect_white_keys(self,imgs):
+        inputs = list()
         with torch.no_grad():
-            img = transform(img)
-            img = img.unsqueeze(0)  
-            img = img.cuda()
-            output = self.key_net(img)
+            for img in imgs:
+                img = self.transform(img).unsqueeze(0)
+                img = img.cuda()
+                inputs.append(img)
+            inputs = torch.cat(inputs,dim=0)
+            output = self.white_key_net(inputs)
             prob = F.softmax(output, dim=1)   #----按行softmax,行的和概率为1,每个元素代表着概
-            #prob = prob.squeeze().cpu().numpy()
             prob = prob.cpu().numpy()
-            pred = np.argmax(prob, 1)
-            result = pred.item()
-            #result = 1 if prob[1]>cfg.KEY_THRESH else 0
+            result = (prob[:,1]>cfg.WHITE_KEY_THRESH).astype(int)
+            pred = np.where(prob[:,1]>cfg.WHITE_KEY_THRESH)[0]
+            for i in range(1,len(pred)):
+                if (pred[i]-pred[i-1])==1:
+                    result[pred[i-1]:pred[i]+1] = (prob[pred[i-1]:pred[i]+1,1]>cfg.NEAR_KEY_THRESH).astype(int)
         return result
+    
+    def detect_black_keys(self,imgs):
+        inputs = list()
+        with torch.no_grad():
+            for img in imgs:
+                img = self.transform(img).unsqueeze(0)
+                img = img.cuda()
+                inputs.append(img)
+            inputs = torch.cat(inputs,dim=0)
+            output = self.black_key_net(inputs)
+            prob = F.softmax(output,dim=1)
+            prob = prob.cpu().numpy()
+            result = (prob[:,1]>cfg.BLACK_KEY_THRESH).astype(int)
+        return result 
 
     def detect_hand(self,img,Rect):
         if img.mode == 'L':
