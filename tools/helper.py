@@ -63,7 +63,7 @@ def vis_detect_white_key(img,
     for ind,loc in enumerate(white_loc):
         if ind ==len(white_loc)-1:
             break 
-        cv2.putText(img_copy, str(ind + 1), (int(white_loc[ind] + 2+rect[0]), int(0.9 *(rect[3]-rect[1]) +rect[1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 1)
+        cv2.putText(img_copy, str(ind + 1), (int(white_loc[ind] + 2+rect[0]), int(0.9 *(rect[3]-rect[1]) +rect[1])), cv2.FONT_HERSHEY_COMPLEX, 0.38, (0, 0, 255), 1)
     for index in key_indexs:
         box1 = total_top[index-1]
         box2 = total_bottom[index-1]
@@ -85,7 +85,7 @@ def vis_detect_black_key(img,
     img_copy = img.copy()
     for ind,box in enumerate(black_boxes):
         x1,y1,w,h = box 
-        cv2.putText(img_copy, str(ind + 1), (int(x1 - 2+rect[0]), int(0.1 *(rect[3]-rect[1]) +rect[1])), cv2.FONT_HERSHEY_COMPLEX, 0.4, (0, 255, 0), 1)
+        cv2.putText(img_copy, str(ind + 1), (int(x1 - 2+rect[0]), int(0.1 *(rect[3]-rect[1]) +rect[1])), cv2.FONT_HERSHEY_COMPLEX, 0.38, (0, 255, 0), 1)
     for index in key_indexs:
         box = black_boxes[index-1]
         x1_loc = int(box[0]+rect[0])
@@ -268,6 +268,34 @@ def black_white_index_dict():
         ib+=1
     return index_dict
 
+def paper_black_white_index_dict():
+    index_dict = {}
+    ib,iw = 1,1
+    for i in range(5):
+        index_dict[str(ib)] = [iw]
+        ib+=1 
+        index_dict[str(ib)] = [iw]
+        iw+=1 
+        index_dict[str(ib)].append(iw)
+        ib+=1 
+        index_dict[str(ib)] = [iw]
+        ib+=1
+        iw+=1 
+        index_dict[str(ib)] = [iw]
+        ib+=1  
+        index_dict[str(ib)] = [iw]
+        iw+=1 
+        index_dict[str(ib)].append(iw)
+        ib+=1 
+        index_dict[str(ib)] = [iw]
+        iw+=1 
+        index_dict[str(ib)].append(iw)
+        ib+=1 
+        index_dict[str(ib)] = [iw]
+        iw+=1
+        ib+=1 
+    index_dict[str(ib)] = [iw-1]
+    return index_dict 
 
 
 def vertify_press_white(key_index,

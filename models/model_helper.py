@@ -15,6 +15,7 @@ sys.path.insert(0,PROJECT_ROOT)
 from config import cfg 
 from .hand_model import build_s3fd 
 from .keys_model import ResNet18 
+from IPython import embed 
 
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
@@ -94,6 +95,7 @@ class ModelProduct(object):
             prob = F.softmax(output,dim=1)
             prob = prob.cpu().numpy()
             result = (prob[:,1]>cfg.BLACK_KEY_THRESH).astype(int)
+            #embed()
         return result 
 
     def detect_hand(self,img,Rect):

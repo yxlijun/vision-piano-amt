@@ -31,8 +31,12 @@ def readvideo2flipvideo(video_path,save_path):
     fourcc = cv2.VideoWriter_fourcc('m','p','4','v')
     save_mp4 = os.path.join(save_path,os.path.basename(video_path))
     videowriter = cv2.VideoWriter(save_mp4,fourcc=fourcc,fps=fps,frameSize=size)
+    count = 0
     while True:
         ret,frame = capture.read()
+        count+=1
+        if count<20:
+            continue
         if not ret:
             break 
         frame = cv2.flip(frame,-1)

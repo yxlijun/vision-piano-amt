@@ -6,6 +6,7 @@ from visAmthelper import VisAmtHelper
 parser = argparse.ArgumentParser()
 parser.add_argument('--img_dir',type=str,default=None)
 parser.add_argument('--video',type=str,default=None)
+parser.add_argument('--paper_data','-p',type=bool,default=False)
 args = parser.parse_args()
 
 
@@ -14,9 +15,9 @@ if __name__=='__main__':
         if args.img_dir[-1]=='/':
             args.img_dir = args.img_dir[0:-1]
         file_mark = args.img_dir.split('/')[-1]
-        visamthelper = VisAmtHelper(file_mark)
-        visamthelper.process_img_dir(args.img_dir) 
+        visamthelper = VisAmtHelper(file_mark,args.paper_data)
+        visamthelper.process_img_dir(args.img_dir)
     if args.video is not None:
         file_mark = os.path.basename(args.video).split('.')[0]
-        visamthelper = VisAmtHelper(file_mark)
+        visamthelper = VisAmtHelper(file_mark,args.paper_data)
         visamthelper.process_video(args.video)
