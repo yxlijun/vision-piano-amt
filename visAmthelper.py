@@ -8,18 +8,24 @@ from models.model_helper import ModelProduct
 from keyboard import KeyBoard
 from bwlabel import BwLabel
 from seghand import SegHand
+from evaluate import Accuracy
 from PIL import Image 
 from tools.helper import * 
-from IPython import embed 
+from tools.warper import *
+from IPython import embed
+from tqdm import tqdm 
 import time 
 
 class VisAmtHelper(object):
-    def __init__(self,file_mark,paper_data = False):
+    def __init__(self,file_mark,midi_file=None,start_frame=0,fps=25.0,midi_offset=0):
         self.init_model_load() 
-        self.paper_data = paper_data 
         self.init_save_file_dir(file_mark)
-        
-    
+
+        self.midi_file = midi_file 
+        self.start_frame = start_frame
+        self.fps = fps 
+        self.midi_offset = midi_offset 
+
     def init_model_load(self):
         self.keyboard = KeyBoard()
         self.hand_seg = SegHand()
@@ -35,104 +41,143 @@ class VisAmtHelper(object):
         self.press_white_img_dir = press_img_dir[0]
         self.press_black_img_dir = press_img_dir[1]
 
-        self.detect_txt = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'pitch.txt')
-        self.detect_video_file = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'output.mp4')
-        if self.paper_data:
-            self.bw_index_dict = paper_black_white_index_dict()
-        else:
-            self.bw_index_dict = black_white_index_dict()
-        
+        self.w_detectPath = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'pitch_white.txt')
+        self.b_detectPath = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'pitch_black.txt')
+        self.videoPath = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'{}.mp4'.format(file_mark))
 
+        self.bw_index_dict = black_white_index_dict()
+    
+    def eval(self,fps):
+        self.frame_result = None
+        self.note_result = None 
+        if self.midi_file is None:
+            return 
+        pframe_time = 1.0/fps 
+        evaluate = Accuracy(self.midi_file,
+                            self.w_detectPath,
+                            self.b_detectPath,
+                            pframe_time = pframe_time,
+                            start_frame = self.start_frame,
+                            midi_offset = self.midi_offset)
+        
+        self.frame_result = evaluate.get_frame_result() 
+        self.note_result = evaluate.get_note_result()
     def process_img_dir(self,img_dir):
         img_lists = [os.path.join(img_dir,x) for x in os.listdir(img_dir) 
                 if x.endswith('jpg') or x.endswith('png')]
         img_lists.sort()
-        base_img,keyboard_rect,start_frame = self.find_base_img(img_lists)
+        base_info = find_base_img(self.keyboard,self.modelproduct,img_lists)
+        base_img = base_info['base_img']
+        keyboard_rect = base_info['rect']
+        start_frame = base_info['count_frame']
+        warp_M = base_info['warp_M']
+        rote_M = base_info['rote_M']
         if base_img is None:
-            return             
-        white_loc,black_boxes,total_top,total_bottom = self.find_key_loc(base_img)
+            return  
+        white_loc,black_boxes,total_top,total_bottom = find_key_loc(self.bwlabel,base_img)
         save_img = vis_white_loc_boxes(base_img,white_loc,black_boxes)
         cv2.imwrite(os.path.join(self.base_img_dir,'base.jpg'),save_img)
         count_frame = 0 
         avgtimer = timer()
         handtimer = timer()
         keypresstimer = timer()
-        fps = 25.0 
-        fout = open(self.detect_txt,'w')
-        for img_file in img_lists:
+        fps = self.fps 
+        fwhite = open(self.w_detectPath,'w')
+        fblack = open(self.b_detectPath,'w')
+
+        for img_file in tqdm(img_lists):
             avgtimer.tic()
             img = Image.open(img_file)
+            w,h = img.size 
             count_frame+=1 
             if count_frame==start_frame:
                 continue 
             file_seq = os.path.basename(img_file).split('.')[0]
             opencv_img = cv2.cvtColor(np.asarray(img),cv2.COLOR_RGB2BGR)
+            if rote_M is not None:
+            	opencv_img = cv2.warpAffine(opencv_img,rote_M,(w,h))
+            if warp_M is not None:
+            	opencv_img = cv2.warpPerspective(opencv_img,warp_M,(w,h))
+            img = Image.fromarray(cv2.cvtColor(opencv_img,cv2.COLOR_BGR2RGB))
             handtimer.tic()
-            #hand_boxes = self.modelproduct.detect_hand(img,keyboard_rect)
             hand_boxes,mask = self.hand_seg.segment_detect_hand(img,keyboard_rect)
             handetime = handtimer.toc()
-            if len(hand_boxes)==0:
+            cur_keyboard_img = opencv_img[keyboard_rect[1]:keyboard_rect[3], keyboard_rect[0]:keyboard_rect[2]]
+            if len(hand_boxes) == 0:
+                base_img = update_base_img(base_img,cur_keyboard_img,white_loc,hand_boxes)
                 continue
-            cur_keyboard_img = opencv_img[keyboard_rect[1]:keyboard_rect[3],keyboard_rect[0]:keyboard_rect[2]]
+            #base_img = update_base_img(base_img,cur_keyboard_img,white_loc,hand_boxes)
             keypresstimer.tic()
-            cur_keyboard_mask = mask[keyboard_rect[1]:keyboard_rect[3],keyboard_rect[0]:keyboard_rect[2]]
-            white_keys_list,black_keys_list,diff_img = self.keypress(base_img,
-                                                cur_keyboard_img,
-                                                cur_keyboard_mask,
-                                                black_boxes,
-                                                white_loc,
-                                                hand_boxes,
-                                                file_seq) 
+            cur_keyboard_mask = mask[keyboard_rect[1]:keyboard_rect[3], keyboard_rect[0]:keyboard_rect[2]]
+            white_keys_list, black_keys_list, diff_img = self.keypress(base_img,
+                                                                       cur_keyboard_img,
+                                                                       cur_keyboard_mask,
+                                                                       black_boxes,
+                                                                       white_loc,
+                                                                       hand_boxes,
+                                                                       file_seq)
             keyetime = keypresstimer.toc()
-            print('process {} total cost:{:.3}s || hand detect:{:.3}s || keypress:{:.3}s'.format(os.path.basename(img_file),
-                                                                                        avgtimer.toc(),handetime,keyetime))
+            avgtimer.toc()
+            #print('process {} total cost:{:.3}s || hand detect:{:.3}s || keypress:{:.3}s'.format(os.path.basename(img_file),
+            #                                                                    avgtimer.toc(), handetime, keyetime))
             save_white_img = vis_detect_white_key(opencv_img,
-                                            hand_boxes,
-                                            white_keys_list,
-                                            white_loc,
-                                            keyboard_rect,
-                                            total_top,
-                                            total_bottom)
+                                                  hand_boxes,
+                                                  white_keys_list,
+                                                  white_loc,
+                                                  keyboard_rect,
+                                                  total_top,
+                                                  total_bottom)
+
             save_black_img = vis_detect_black_key(opencv_img,
-                                                hand_boxes,
-                                                black_keys_list,
-                                                keyboard_rect,
-                                                black_boxes)
+                                                  hand_boxes,
+                                                  black_keys_list,
+                                                  keyboard_rect,
+                                                  black_boxes)
 
             save_total_img = vis_detect_total_key(opencv_img,
-                                            hand_boxes,
-                                            white_keys_list,
-                                            black_keys_list,
-                                            white_loc,
-                                            keyboard_rect,
-                                            total_top,
-                                            total_bottom,
-                                            black_boxes) 
+                                                  os.path.basename(img_file),
+                                                  hand_boxes,
+                                                  white_keys_list,
+                                                  black_keys_list,
+                                                  white_loc,
+                                                  keyboard_rect,
+                                                  total_top,
+                                                  total_bottom,
+                                                  black_boxes)
             cv2.imwrite(os.path.join(self.detect_white_img_dir,os.path.basename(img_file)),save_white_img)
             cv2.imwrite(os.path.join(self.detect_black_img_dir,os.path.basename(img_file)),save_black_img)
             cv2.imwrite(os.path.join(self.detect_total_img_dir,os.path.basename(img_file)),save_total_img)
             cv2.imwrite(os.path.join(self.diff_img_dir,os.path.basename(img_file)),diff_img)
-            save_detect_result(white_keys_list,img_file,fout,fps,count_frame)
+            save_detect_result(white_keys_list, img_file, fwhite, fps)
+            save_detect_result(black_keys_list, img_file, fblack, fps)
+        fwhite.close()
+        fblack.close()
         print('avg process time:{:.3}s'.format(avgtimer.elapsed()))
-        img2video(self.detect_total_img_dir,self.detect_video_file)
+        self.eval(fps)
+        img2video(self.detect_total_img_dir,self.videoPath)
 
     def process_video(self,video_file):
         capture = cv2.VideoCapture(video_file)
         if not capture.isOpened():
             raise ValueError('read video wrong')
         fps = capture.get(cv2.CAP_PROP_FPS)
-        base_img,keyboard_rect,start_frame = self.find_video_base_img(video_file)
-        cv2.imwrite('base.jpg',base_img)
+        base_info = find_video_base_img(self.keyboard,self.modelproduct,video_file)
+        base_img = base_info['base_img']
+        keyboard_rect = base_info['rect']
+        start_frame = base_info['count_frame']
+        warp_M = base_info['warp_M']
+        rote_M = base_info['rote_M']
         if base_img is None:
-            return             
-        white_loc,black_boxes,total_top,total_bottom = self.find_key_loc(base_img)
+            return 
+        white_loc,black_boxes,total_top,total_bottom = find_key_loc(self.bwlabel,base_img)
         save_img = vis_white_loc_boxes(base_img,white_loc,black_boxes)
         cv2.imwrite(os.path.join(self.base_img_dir,'base.jpg'),save_img)
         count_frame = 0
         avgtimer = timer()
         handtimer = timer()
         keypresstimer = timer()
-        fout = open(self.detect_txt,'w')
+        fwhite = open(self.w_detectPath,'w')
+        fblack = open(self.b_detectPath,'w')
         while True:
             avgtimer.tic()
             ret,opencv_img = capture.read()
@@ -141,27 +186,32 @@ class VisAmtHelper(object):
                 continue 
             if not ret:
                 break 
-            img = Image.fromarray(cv2.cvtColor(opencv_img,cv2.COLOR_BGR2RGB))
+            if rote_M is not None:
+                opencv_img = cv2.warpAffine(opencv_img,rote_M,(w,h))
+            if warp_M is not None:
+                opencv_img = cv2.warpPerspective(opencv_img,warp_M,(w,h))
+            img = Image.fromarray(cv2.cvtColor(opencv_img,cv2.COLOR_BGR2RGB))            
             handtimer.tic()
-            #hand_boxes = self.modelproduct.detect_hand(img,keyboard_rect)
-            hand_boxes,mask = self.hand_seg.segment_detect_hand(img,keyboard_rect)
+            cur_keyboard_img = opencv_img[keyboard_rect[1]:keyboard_rect[3], keyboard_rect[0]:keyboard_rect[2]]
+            hand_boxes, mask = self.hand_seg.segment_detect_hand(img, keyboard_rect)
             handetime = handtimer.toc()
-            if len(hand_boxes)==0:
-                continue 
+            if len(hand_boxes) == 0:
+                base_img = update_base_img(base_img,cur_keyboard_img,white_loc,hand_boxes)
+                continue
             file_seq = str(count_frame).zfill(5)
-            cur_keyboard_img = opencv_img[keyboard_rect[1]:keyboard_rect[3],keyboard_rect[0]:keyboard_rect[2]]
             keypresstimer.tic()
-            cur_keyboard_mask = mask[keyboard_rect[1]:keyboard_rect[3],keyboard_rect[0]:keyboard_rect[2]]
-            white_keys_list,black_keys_list,diff_img = self.keypress(base_img,
-                                               cur_keyboard_img,
-                                               cur_keyboard_mask,
-                                               black_boxes,
-                                               white_loc,
-                                               hand_boxes,
-                                               file_seq)
+            cur_keyboard_mask = mask[keyboard_rect[1]:keyboard_rect[3], keyboard_rect[0]:keyboard_rect[2]]
+            white_keys_list, black_keys_list, diff_img = self.keypress(base_img,
+                                                                       cur_keyboard_img,
+                                                                       cur_keyboard_mask,
+                                                                       black_boxes,
+                                                                       white_loc,
+                                                                       hand_boxes,
+                                                                       file_seq)
             keyetime = keypresstimer.toc()
-            print('process {}.jpg total cost:{:.3}s || hand detect:{:.3}s || keypress:{:.3}s'.format(str(count_frame).zfill(5),
-                                                                                            avgtimer.toc(),handetime,keyetime))
+            print('process {}.jpg total cost:{:.3}s || hand detect:{:.3}s || keypress:{:.3}s'.format(
+                str(count_frame).zfill(5),
+                avgtimer.toc(), handetime, keyetime))
             save_white_img = vis_detect_white_key(opencv_img,
                                                   hand_boxes,
                                                   white_keys_list,
@@ -176,6 +226,7 @@ class VisAmtHelper(object):
                                                   black_boxes)
 
             save_total_img = vis_detect_total_key(opencv_img,
+                                                  '{}.jpg'.format(str(count_frame).zfill(5)),
                                                   hand_boxes,
                                                   white_keys_list,
                                                   black_keys_list,
@@ -184,14 +235,18 @@ class VisAmtHelper(object):
                                                   total_top,
                                                   total_bottom,
                                                   black_boxes)
-            cv2.imwrite(os.path.join(self.detect_white_img_dir,'{}.jpg'.format(str(count_frame).zfill(5))),save_white_img)
-            cv2.imwrite(os.path.join(self.detect_black_img_dir,'{}.jpg'.format(str(count_frame).zfill(5))),save_black_img)
-            cv2.imwrite(os.path.join(self.detect_total_img_dir,'{}.jpg'.format(str(count_frame).zfill(5))),save_total_img)
-            cv2.imwrite(os.path.join(self.diff_img_dir,'{}.jpg'.format(str(count_frame).zfill(5))),diff_img)
-            save_detect_result(white_keys_list,'{}.jpg'.format(str(count_frame).zfill(5)),fout,fps,count_frame)
+            cv2.imwrite(os.path.join(self.detect_white_img_dir, '{}.jpg'.format(str(count_frame).zfill(5))),save_white_img)
+            cv2.imwrite(os.path.join(self.detect_black_img_dir, '{}.jpg'.format(str(count_frame).zfill(5))),save_black_img)
+            cv2.imwrite(os.path.join(self.detect_total_img_dir, '{}.jpg'.format(str(count_frame).zfill(5))),save_total_img)
+            cv2.imwrite(os.path.join(self.diff_img_dir, '{}.jpg'.format(str(count_frame).zfill(5))), diff_img)
+            save_detect_result(white_keys_list, '{}.jpg'.format(str(count_frame).zfill(5)), fwhite, fps)
+            save_detect_result(black_keys_list, '{}.jpg'.format(str(count_frame).zfill(5)), fblack, fps)
         print('avg process time:{:.3}s'.format(avgtimer.elapsed()))
+        fwhite.close()
+        fblack.close()
         capture.release() 
-        img2video(self.detect_total_img_dir,self.detect_video_file)
+        self.eval(fps)
+        img2video(self.detect_total_img_dir,self.videoPath)
 
     def keypress(self,
                 base_img,
@@ -206,8 +261,12 @@ class VisAmtHelper(object):
         base_img = cv2.cvtColor(base_img,cv2.COLOR_BGR2GRAY)
         diff_img = cv2.absdiff(base_img,cur_img)
         diff_img = cv2.cvtColor(diff_img,cv2.COLOR_GRAY2BGR)
-
+        
         h,w= diff_img.shape[:2]
+        base_img1 = base_img.astype(np.float32)
+        cur_img1 = cur_img.astype(np.float32)
+        diff_img_white = np.maximum(base_img1-cur_img1,0).astype(np.uint8)
+        diff_img_black = np.maximum(cur_img1-base_img1,0).astype(np.uint8)
         offset = 3
         whole_list = []
         for hand_list in  index_list:
@@ -229,19 +288,30 @@ class VisAmtHelper(object):
                 cv2.imwrite(press_path,crop_img)
                 input_imgs.append(input_img)
             stime = time.time()
-            pred = self.modelproduct.detect_white_keys(input_imgs)
+            pred,prob = self.modelproduct.detect_white_keys(input_imgs)
             for idx,key_index in enumerate(whole_list):
                 if pred[idx]==1:
-                    if vertify_press_white(key_index+1,hand_mask,self.bw_index_dict,black_boxes):
+                    press,flag = vertify_press_white(key_index+1,hand_mask,self.bw_index_dict,black_boxes,hand_boxes,white_loc,prob[idx])
+                    if flag==0 and press:
                         detect_white_keys.append(key_index+1)
-        
+                    if flag:
+                        start = max(int(white_loc[key_index]-offset),0)
+                        end = min(int(white_loc[key_index+1]+offset),w)
+                        crop_img = diff_img_white[0:h,start:end]
+                        input_img = Image.fromarray(cv2.cvtColor(crop_img,cv2.COLOR_BGR2RGB))
+                        input_imgs = [input_img]
+                        cur_pred,cur_prob = self.modelproduct.detect_white_keys(input_imgs)
+                        if cur_pred[0]==1:
+                            #embed()
+                            detect_white_keys.append(key_index+1)
+
         black_index_list = near_black(black_boxes,hand_boxes)
         black_whole_list = []
         for hand_list in black_index_list:
             for index in range(hand_list[0],hand_list[1]+1):
                 black_whole_list.append(index)
         black_whole_list = np.maximum(black_whole_list,0)
-        black_whole_list = np.minimum(black_whole_list,len(black_boxes)-2) 
+        black_whole_list = np.minimum(black_whole_list,len(black_boxes)-1) 
         black_whole_list = list(set(black_whole_list))
         black_whole_list.sort()
         detect_black_keys = []
@@ -261,73 +331,4 @@ class VisAmtHelper(object):
                 if pred[idx]==1:
                     if vertify_press_black(key_index,hand_mask,black_boxes):
                         detect_black_keys.append(key_index+1)
-
-        return detect_white_keys,detect_black_keys,diff_img 
-
-    
-    def find_base_img(self,img_list):
-        base_img,rect = None,None 
-        count_frame = 0 
-        for img_path in img_list:
-            img = Image.open(img_path)
-            count_frame+=1 
-            rect,has_keyboard = self.keyboard.detect_keyboard(img)
-            if not has_keyboard:
-                continue 
-            hand_boxes = self.modelproduct.detect_hand(img,rect)
-            img = cv2.cvtColor(np.asarray(img),cv2.COLOR_RGB2BGR)
-            base_img = img[rect[1]:rect[3],rect[0]:rect[2]]
-            if len(hand_boxes)==0:
-                return base_img,rect,count_frame 
-            if len(hand_boxes)==1:
-                hand_xmin,hand_ymin = hand_boxes[0][0][0],hand_boxes[0][0][1]
-                if hand_ymin>rect[3]+5:
-                    return base_img,rect,count_frame 
-            if len(hand_boxes)>1:
-                hand_xmin1,hand_ymin1 = hand_boxes[0][0][0],hand_boxes[0][0][1]
-                hand_xmin2,hand_ymin2 = hand_boxes[1][0][0],hand_boxes[1][0][1]
-                if hand_ymin1>rect[3]+5 or hand_ymin2>rect[3]+5:
-                    return base_img,rect,count_frame 
-        return base_img, rect,count_frame 
-    
-    def find_key_loc(self,base_img):
-        img = base_img.copy()
-        if self.paper_data:
-            white_loc,black_boxes,total_top,total_bottom = self.bwlabel.key_loc_paper_data(img)
-        else:
-            white_loc,black_boxes,total_top,total_bottom = self.bwlabel.key_loc(img)
-        return white_loc,black_boxes,total_top,total_bottom 
-
-    def find_video_base_img(self,video_file):
-        base_img,rect = None,None 
-        count_frame = 0
-        capture = cv2.VideoCapture(video_file)
-        if not capture.isOpened():
-            return base_img,rect,count_frame 
-        while True:
-            ret,frame = capture.read()
-            count_frame+=1 
-            if not ret:
-                break 
-            img = Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
-            rect,has_keyboard = self.keyboard.detect_keyboard(img)
-            if not has_keyboard:
-                continue
-            hand_boxes = self.modelproduct.detect_hand(img,rect)
-            base_img = frame[rect[1]:rect[3],rect[0]:rect[2]]
-            if len(hand_boxes)==0:
-                capture.release()
-                return base_img,rect,count_frame 
-            if len(hand_boxes)==1:
-                hand_xmin,hand_ymin = hand_boxes[0][0][0],hand_boxes[0][0][1]
-                if hand_ymin>rect[3]+5:
-                    capture.release()
-                    return base_img,rect,count_frame 
-            if len(hand_boxes)>1:
-                hand_xmin1,hand_ymin1 = hand_boxes[0][0][0],hand_boxes[0][0][1]
-                hand_xmin2,hand_ymin2 = hand_boxes[1][0][0],hand_boxes[1][0][1]
-                if hand_ymin1>rect[3]+5 or hand_ymin2>rect[3]+5:
-                    capture.release()
-                    return base_img,rect,count_frame 
-        capture.release()
-        return base_img,rect,count_frame 
+        return detect_white_keys,detect_black_keys,diff_img  

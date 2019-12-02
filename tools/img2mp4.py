@@ -4,6 +4,11 @@ from PIL import Image
 import numpy as np
 import argparse 
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--video',type=str)
+parser.add_argument('--root',type=str)
+args = parser.parse_args()
+
 def img2video(path,size=(1280,720)):
     fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
     vw = cv2.VideoWriter('output.mp4', fourcc=fourcc, fps=25.0, frameSize=size)
@@ -20,40 +25,61 @@ def img2video(path,size=(1280,720)):
 
 
 def readvideo2flipvideo(video_path,save_path):
+    save_img_dir = os.path.join(os.path.split(save_path)[0],'images',os.path.basename(save_path).split('.')[0])
+    if not os.path.exists(save_img_dir):
+        os.makedirs(save_img_dir)
     capture = cv2.VideoCapture(video_path)
     if not capture.isOpened():
         raise ValueError('read video wrong')
     fps = capture.get(cv2.CAP_PROP_FPS)
-
+    print(fps)
+    return 
     size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), 
             int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-
     fourcc = cv2.VideoWriter_fourcc('m','p','4','v')
-    save_mp4 = os.path.join(save_path,os.path.basename(video_path))
-    videowriter = cv2.VideoWriter(save_mp4,fourcc=fourcc,fps=fps,frameSize=size)
+    videowriter = cv2.VideoWriter(save_path,fourcc=fourcc,fps=fps,frameSize=size)
     count = 0
     while True:
         ret,frame = capture.read()
-        count+=1
-        if count<20:
-            continue
         if not ret:
             break 
         frame = cv2.flip(frame,-1)
         f_img = Image.fromarray(frame)
         f_re = f_img.resize(list(size),resample=Image.NONE)
         f_out = np.array(f_re)
-        videowriter.write(f_out)
-
+        videowriter.write(f_out) 
+        save_img = os.path.join(save_img_dir,'{}.jpg'.format(str(count).zfill(4)))
+        cv2.imwrite(save_img,f_out)
+        count+=1
     videowriter.release()
 
 
+
+def list_wmvdir(path,wmv_files):
+    subpaths = [os.path.join(path,x) for x in os.listdir(path)]
+    for spath in subpaths:
+        if os.path.isdir(spath):
+            list_wmvdir(spath,wmv_files)
+        elif spath.endswith('wmv') or spath.endswith('MP4'):
+            wmv_files.append(spath)
+
+
+def main(wmv_files):
+    if isinstance(wmv_files,list):
+        for video_path in wmv_files:
+            if 'wmv' in video_path:
+                save_path = video_path.replace('wmv','mp4')
+            elif 'MP4' in video_path:
+                save_path = video_path.replace('MP4','mp4')
+            readvideo2flipvideo(video_path,save_path)
+    else:
+        save_path = os.path.splitext(wmv_files)[0]+'_tran.mp4'
+        print(save_path)
+        readvideo2flipvideo(wmv_files,save_path)
+        
+
 if __name__=='__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--video','-v',type=str,help='video')
-    parser.add_argument('--save_path','-s',type=str,default='/home/lj/project/piano_keys/visAmt/test_imgs/paperData')
-    args = parser.parse_args()
-    
-    if not os.path.exists(args.save_path):
-        os.makedirs(args.save_path)
-    readvideo2flipvideo(args.video,args.save_path)
+    train_files = []
+    list_wmvdir(args.root,train_files)
+    main(train_files)
+    #main(args.video)

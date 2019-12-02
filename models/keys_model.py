@@ -37,11 +37,10 @@ class ResidualBlock(nn.Module):
         return F.relu(out)
 
 class ResNet18(nn.Module):
-    def __init__(self, num_classes=2):
+    def __init__(self,input_channel = 3,base_channel=64,num_classes=2):
         super(ResNet18,self).__init__()
-        base_channel = 64
         self.pre_layer = nn.Sequential(
-            nn.Conv2d(3, base_channel, kernel_size=7, stride=2, padding=3),
+            nn.Conv2d(input_channel, base_channel, kernel_size=7, stride=2, padding=3),
             nn.BatchNorm2d(base_channel),
             nn.ReLU(True),
             nn.MaxPool2d(kernel_size=3,stride=2)
@@ -54,7 +53,7 @@ class ResNet18(nn.Module):
         self.block_6 = ResidualBlock(base_channel*4,base_channel*4,stride=1,need_shortcut=False)
         self.block_7 = ResidualBlock(base_channel*4,base_channel*8,stride=2,need_shortcut=True)
         self.block_8 = ResidualBlock(base_channel*8,base_channel*8,stride=1,need_shortcut=False)
-        self.avepool = nn.AvgPool2d(kernel_size=7,stride=1)
+        self.avepool = nn.AvgPool2d(kernel_size=(7,7),stride=1)
         self.fc = nn.Linear(base_channel*8,num_classes)
         self.num_classes = num_classes
 

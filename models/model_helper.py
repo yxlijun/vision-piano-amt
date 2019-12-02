@@ -33,15 +33,23 @@ class ModelProduct(object):
         self.load_det_hand_model() 
         self.load_white_key_model()
         self.load_black_key_model()
-        print('->>finish det hand model load')
-        print('->>finish whitekey model load')
-        print('->>finish blackkey model load')
+        #print('->>finish det hand model load')
+        #print('->>finish whitekey model load')
+        #print('->>finish blackkey model load')
 
 
-        self.transform = transforms.Compose([
+        self.transform_white = transforms.Compose([
             transforms.Resize((224, 224)),
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+            #transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+            ])
+
+        self.transform_black = transforms.Compose([
+            transforms.Grayscale(),
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            #transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+            ])
         
     def load_det_hand_model(self):
         self.hand_net = build_s3fd('test',cfg.NUM_CLASSES)
@@ -52,24 +60,28 @@ class ModelProduct(object):
         cudnn.benchmark = True 
 
     def load_white_key_model(self):
-        self.white_key_net = ResNet18(num_classes=cfg.KEY_NUM_CLASSES)
+        self.white_key_net = ResNet18(input_channel=3,
+                                    base_channel=cfg.WHITE_BASE_CHANNEL,
+                                    num_classes=cfg.KEY_NUM_CLASSES)
         self.white_key_net.load_state_dict(torch.load(cfg.KEY_WHITE_MODEL))
         self.white_key_net.eval()
         if torch.cuda.is_available():
             self.white_key_net.cuda()
 
     def load_black_key_model(self):
-        self.black_key_net = ResNet18(num_classes = cfg.KEY_NUM_CLASSES)
+        self.black_key_net = ResNet18(input_channel = 1,
+                                     base_channel=cfg.BLACK_BASE_CHANNEL,
+                                     num_classes = cfg.KEY_NUM_CLASSES)
         self.black_key_net.load_state_dict(torch.load(cfg.KEY_BLACK_MODEL))
         self.black_key_net.eval()
         if torch.cuda.is_available():
             self.black_key_net.cuda()
 
-    def detect_white_keys(self,imgs):
+    def detect_white_keys(self,imgs,debug=False):
         inputs = list()
         with torch.no_grad():
             for img in imgs:
-                img = self.transform(img).unsqueeze(0)
+                img = self.transform_white(img).unsqueeze(0)
                 img = img.cuda()
                 inputs.append(img)
             inputs = torch.cat(inputs,dim=0)
@@ -78,16 +90,24 @@ class ModelProduct(object):
             prob = prob.cpu().numpy()
             result = (prob[:,1]>cfg.WHITE_KEY_THRESH).astype(int)
             pred = np.where(prob[:,1]>cfg.WHITE_KEY_THRESH)[0]
+            if debug:
+                embed()
             for i in range(1,len(pred)):
                 if (pred[i]-pred[i-1])==1:
-                    result[pred[i-1]:pred[i]+1] = (prob[pred[i-1]:pred[i]+1,1]>cfg.NEAR_KEY_THRESH).astype(int)
-        return result
+                    if prob[pred[i-1],1]<cfg.NEAR_KEY_THRESH and prob[pred[i],1]<cfg.NEAR_KEY_THRESH:
+                        if prob[pred[i-1],1]<prob[pred[i],1]:
+                            result[pred[i-1]] = 0 
+                        else:
+                            result[pred[i]] = 0 
+                    else:
+                        result[pred[i-1]:pred[i]+1] = (prob[pred[i-1]:pred[i]+1,1]>cfg.NEAR_KEY_THRESH).astype(int)
+        return result,prob[:,1]
     
-    def detect_black_keys(self,imgs):
+    def detect_black_keys(self,imgs,debug=False):
         inputs = list()
         with torch.no_grad():
             for img in imgs:
-                img = self.transform(img).unsqueeze(0)
+                img = self.transform_black(img).unsqueeze(0)
                 img = img.cuda()
                 inputs.append(img)
             inputs = torch.cat(inputs,dim=0)
@@ -95,7 +115,8 @@ class ModelProduct(object):
             prob = F.softmax(output,dim=1)
             prob = prob.cpu().numpy()
             result = (prob[:,1]>cfg.BLACK_KEY_THRESH).astype(int)
-            #embed()
+            if debug:
+                embed()
         return result 
 
     def detect_hand(self,img,Rect):

@@ -3,21 +3,7 @@ import cv2
 import os
 import numpy as np 
 from IPython import embed 
-
-class Stack(object):
-    #----list方式实现栈
-    def __init__(self):
-        self.items = []
-    def is_empty(self):
-        return self.items == []
-    def peek(self):
-        return self.items[len(self.items) - 1]
-    def size(self):
-        return len(self.items)
-    def push(self, item):
-        self.items.append(item)
-    def pop(self):
-        return self.items.pop()
+from util import find_connect_domain
 
 def remove_region(img):
     if len(img.shape) == 3:
@@ -41,6 +27,12 @@ def near_white(white_loc,black_boxes):
     index = diffs.index(min(diffs))
     return index
 
+def contrast_img(img, c, b):
+    rows, cols, channels = img.shape 
+    blank = np.zeros([rows, cols, channels], img.dtype)
+    dst = cv2.addWeighted(img, c, blank, 1-c, b)
+    return  dst 
+
 class BwLabel(object):
     def __init__(self):
         super(BwLabel, self).__init__()
@@ -50,55 +42,34 @@ class BwLabel(object):
         black_boxes = []
         total_top = []
         total_bottom = [] 
-        
+        black_loc = []
+        ''' 
         ori_img = base_img.copy()
         height,width,_ = base_img.shape 
-        '''
         base_img = cv2.cvtColor(base_img, cv2.COLOR_BGR2GRAY)
         base_img = remove_region(base_img)
         _, base_img = cv2.threshold(base_img, 150, 255, cv2.THRESH_BINARY) 
         base_img = cv2.GaussianBlur(base_img, (5, 5), 0)
-        feather = {}
-        self.bwlabel(base_img,feather)
-        black_loc = []
-        for box in feather['value']['boundinbox']:  #---字典类型,同时取k,v就是for k,v in dict.items(),取k是dict.keys(),v是dict.values()
-            black_boxes.append(box)
-            black_loc.append(box[0])  #---box左上角的横坐标
-        '''
-        base_img = cv2.cvtColor(base_img,cv2.COLOR_BGR2GRAY)
-        base_img = remove_region(base_img)
-        _,base_img = cv2.threshold(base_img,150,255,cv2.THRESH_BINARY_INV)
-        
-        black_boxes = self.find_black_keys(base_img)
-        black_boxes = sorted(black_boxes,key = lambda x:x[0])
+        black_boxes = find_connect_domain(base_img)
         black_loc = [box[0] for box in black_boxes]
-
-        # #----得到白键的区域
-        black_gap1 = black_loc[3] - black_loc[2]  #--第一个周期区域内的黑键间隔
-        ratio = 23.0 / 41
-        # ratio = 23.0 / 40
-        whitekey_width1 = ratio * black_gap1  
-        half_width1 = black_boxes[4][2]    #T1中第四个黑键被均分,从该位置开始算区域起始位置
-        keybegin = black_loc[4] + half_width1 / 2.0-7.0 * whitekey_width1
-        for i in range(10):
-            if int(keybegin + i * whitekey_width1) < 0:
-                white_loc.append(1)
+        '''
+        ori_img = base_img.copy()
+        height,width,_ = ori_img.shape 
+        black_boxes,black_loc = self.find_black_boxes(ori_img)
+        if len(black_boxes)!=36:
+            ori_img = contrast_img(ori_img,1.3,3)
+            black_boxes,black_loc = self.find_black_boxes(ori_img)
+        if len(black_boxes)==37:
+            area1 = black_boxes[0][2]*black_boxes[0][3]
+            area2 = black_boxes[-1][2]*black_boxes[-1][3]
+            if area1>area2:
+                del black_boxes[-1]
             else:
-                white_loc.append(keybegin + i * whitekey_width1)
-        for i in range(6):  #----剩下的6个循环区域
-            axis = 8 + i * 5
-            black_gap2 = black_loc[axis] - black_loc[axis - 1]
-            whitekey_width2 = ratio * black_gap2 
-            half_width2 = black_boxes[axis + 1][2] 
-            keybegin1 = black_loc[axis + 1] + float(half_width2 / 2.0) - 5.0 * whitekey_width2
-            for j in range(1,8):
-                white_loc.append(keybegin1 + j * whitekey_width2)
-            if i == 5:  #----最后一次循环将钢琴最后一个白键加上
-                if width < int(keybegin1 + 8 * whitekey_width2):
-                    white_loc.append(width - 1)
-                else:
-                    white_loc.append(keybegin1 + 8 * whitekey_width2)
-        print("the number of whtiekey_num is {}".format(len(white_loc)))
+                del black_boxes[0]
+        assert len(black_boxes)==36,'black number is wrong'
+        # #----得到白键的区域
+        white_loc = self.find_white_loc_old(black_loc,black_boxes,width)
+        #print("the number of whitekey_num is {}".format(len(white_loc)))
         #--------找到白键所在的box---
         for i in range(1, len(white_loc)):
             white_x = white_loc[i - 1]
@@ -123,6 +94,7 @@ class BwLabel(object):
 
             elif (i == 4 or ((i - 4) % 7 == 0) and i < 52) or (i == 7 or ((i - 7) % 7 == 0) and i < 52) or (i == 8 or ((i - 8) % 7 == 0) and i < 52):
                 index = near_white(white_x, black_boxes)
+                index = min(len(black_boxes)-2,index)
                 top_box = (black_boxes[index][0]+black_boxes[index][2], 0, black_boxes[index+1][0] - (black_boxes[index][0]+black_boxes[index][2]) - 1, 1.1 * black_boxes[index][3])
                 bottom_box=(white_x,1.1*black_boxes[index][3],white_width+2,height-1.1*black_boxes[index][3])
                 total_top.append(top_box)
@@ -144,74 +116,113 @@ class BwLabel(object):
         total_top = np.array(total_top,dtype=np.int32)
         total_bottom = np.array(total_bottom,dtype=np.int32)
         return  white_loc,black_boxes,total_top,total_bottom
-
-    def bwlabel(self,cur_img, feather):
-        h,w = cur_img.shape[:2]
-        rightBoundary,topBoundary,bottomBoundary,labelValue = 0,0,0,0
-        feather.clear()
-        dst = cur_img.copy() 
-        pointstack = Stack()
-        feather['value'] = {}
-        feather['value']['area'] = []
-        feather['value']['boundinbox'] = []
-        for i in range(h):
-            for j in range(w):
-                if dst[i,j]!=0:
-                    continue 
-                area = 0 
-                labelValue+=1
-                seed = (i,j)
-                dst[seed] = labelValue
-                pointstack.push(seed)
-                area+=1
-                leftBoundary = seed[1]
-                rightBoundary = seed[1]
-                topBoundary = seed[0]
-                bottomBoundary = seed[0]   #---这个和C++版本的有区别
-                while (not (pointstack.is_empty())):
-                    neighbor = (seed[0], seed[1] + 1)  #---right
-                    if (seed[1] != (w - 1)) and (dst[neighbor] == 0):
-                        dst[neighbor] = labelValue
-                        pointstack.push(neighbor)
-                        area += 1
-                        if (rightBoundary < neighbor[1]):
-                            rightBoundary = neighbor[1]
-                    neighbor = (seed[0]+1, seed[1])  #---bottom
-                    if ((seed[0] != (h - 1)) and (dst[neighbor] == 0)):
-                        dst[neighbor] = labelValue
-                        pointstack.push(neighbor)
-                        area += 1
-                        if (bottomBoundary < neighbor[0]):
-                            bottomBoundary = neighbor[0]
-                    neighbor = (seed[0], seed[1]-1)  #---left
-                    if ((seed[1] != 0) and (dst[neighbor] == 0)):
-                        dst[neighbor] = labelValue
-                        pointstack.push(neighbor)
-                        area += 1
-                        if (leftBoundary > neighbor[1]):
-                            leftBoundary = neighbor[1]  
-                    neighbor = (seed[0]-1, seed[1])   #---top
-                    if ((seed[0] != 0) and (dst[neighbor] == 0)):
-                        dst[neighbor] = labelValue
-                        pointstack.push(neighbor)
-                        area += 1
-                        if (topBoundary > neighbor[0]):
-                            topBoundary = neighbor[0]
-                    seed = pointstack.peek()  #--取栈顶元素并出栈
-                    pointstack.pop()
-                box = (leftBoundary, topBoundary, rightBoundary - leftBoundary, bottomBoundary - topBoundary)  #--(x,y,w,h)
-                if area>500:    #---排除一些小框框,二值化的时候表现的不太好
-                    feather['value']['area'].append(area)
-                    feather['value']['boundinbox'].append(box)
-        box_num = len(feather['value']['boundinbox'])  #---黑键的数量
-        return box_num
     
+    def find_black_boxes(self,ori_img):
+        thresh = 125
+        while True:
+            base_img = ori_img.copy()
+            height,width,_ = base_img.shape 
+            base_img = cv2.cvtColor(base_img,cv2.COLOR_BGR2GRAY)
+            base_img = remove_region(base_img)
+            _,base_img = cv2.threshold(base_img,thresh,255,cv2.THRESH_BINARY_INV)
+        
+            black_boxes = self.find_black_keys(base_img)
+            black_boxes = sorted(black_boxes,key = lambda x:x[0])
+            black_loc = [box[0] for box in black_boxes]
+            if len(black_loc)>36:
+                thresh-=1
+            elif len(black_loc)<36:
+                thresh+=1
+            else:
+                break 
+            if thresh<90 or thresh>150:
+                break
+        return black_boxes,black_loc 
+
+    def find_white_loc_old(self,black_loc,black_boxes,width):
+        white_loc = []
+        black_gap1 = black_loc[3] - black_loc[2]  #--第一个周期区域内的黑键间隔
+        ratio = 23.0 / 41
+        # ratio = 23.0 / 40
+        whitekey_width1 = ratio * black_gap1  
+        half_width1 = black_boxes[4][2]    #T1中第四个黑键被均分,从该位置开始算区域起始位置
+        keybegin = black_loc[4] + half_width1 / 2.0-7.0 * whitekey_width1
+        for i in range(10):
+            if int(keybegin + i * whitekey_width1) < 0:
+                white_loc.append(1)
+            else:
+                white_loc.append(keybegin + i * whitekey_width1)
+        for i in range(6):  #----剩下的6个循环区域
+            axis = 8 + i * 5
+            black_gap2 = black_loc[axis] - black_loc[axis - 1]
+            whitekey_width2 = ratio * black_gap2 
+            half_width2 = black_boxes[axis + 1][2] 
+            keybegin1 = black_loc[axis + 1] + float(half_width2 / 2.0) - 5.0 * whitekey_width2
+            for j in range(1,8):
+                white_loc.append(keybegin1 + j * whitekey_width2)
+            if i == 5:  #----最后一次循环将钢琴最后一个白键加上
+                if width < int(keybegin1 + 8 * whitekey_width2):
+                    white_loc.append(width - 1)
+                else:
+                    white_loc.append(keybegin1 + 8 * whitekey_width2)
+        return white_loc 
+
+    def find_white_loc(self,black_loc):
+        white_loc = []
+        black_gap1 = black_loc[2] - black_loc[1]
+        # w_gap1 = 63.0 / 28 * black_gap1 / 3  #---T1前三个白键的间隔
+        w_gap1 = 70.0 / 28 * black_gap1 / 3  #---T1前三个白键的间隔
+        w_begin1 = black_loc[1] - 2.0 / 3 * black_gap1
+        # w_begin1 = black_loc[1] - 1.0 / 2 * black_gap1
+        for i in range(3):
+            white_loc.append(w_begin1 + i * w_gap1)
+
+        #----最开始的那两个白键
+        for i in range(1,3):
+            if int(w_begin1 - i * w_gap1) < 0:
+                white_loc.append(1)
+            else:
+                white_loc.append(w_begin1 - i * w_gap1)
+
+        #----周期内后4个白键
+        black_gap2 = black_loc[5] - black_loc[4]
+        w_gap2 = 94.0 / 27 * black_gap2 / 4  #---T1前三个白键的间隔
+        w_begin2 = black_loc[3] - 16.0 / 27 * black_gap2
+        # w_begin2 = black_loc[3] - 13.0 / 27 * black_gap2
+        for i in range(4):
+            white_loc.append(w_begin2 + i * w_gap2)
+
+        #----后面的那几个周期
+        for i in range(6):
+            axis1 = 7 + i * 5
+            black_gap3 = black_loc[axis1] - black_loc[axis1 - 1]
+            w_gap3 = 70.0 / 28 * black_gap3 / 3  #---T1前三个白键的间隔
+            w_begin3 = black_loc[axis1 - 1] - 2.0 / 3 * black_gap3
+            #----前3个白键
+            for j in range(3):
+                white_loc.append(w_begin3 + j * w_gap3)
+
+            axis2 = 10 + i * 5
+            black_gap4 = black_loc[axis2] - black_loc[axis2 - 1]
+            w_gap4 = 94.0 / 27 * black_gap4 / 4  #---T1前三个白键的间隔
+            w_begin4 = black_loc[axis2 - 2] - 16.0 / 27 * black_gap4
+            #---后4个白键
+            if i == 5:   #---最后一个周期把最后两个键也加上
+                for j in range(6):
+                    white_loc.append(w_begin4 + j * w_gap4)
+            else:
+                for j in range(4):
+                    white_loc.append(w_begin4 + j * w_gap4)
+        white_loc.sort()
+        return white_loc 
+
     def find_black_keys(self,base_img):
         contours,_ = cv2.findContours(base_img,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
         black_boxes = []
+        height,width = base_img.shape[:2]
         for idx,cnt in enumerate(contours):
             (x,y,w,h) = cv2.boundingRect(cnt)
-            if w*h>500:
+            if h>height*0.3 and w>4:
                 x1,y1,x2,y2 = x,y,x+w,y+h 
                 for i in range(y2,y1,-1):
                     count = 0 

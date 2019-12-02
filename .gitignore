@@ -6,3 +6,6 @@
 weights/
 saved/
 test_imgs/
+bad_base/
+__pycache__/
+
