@@ -71,28 +71,16 @@ state = {k: v for k, v in args._get_kwargs()}
 
 if args.type == 'white':
     if args.data=='paperdata':
-        TRAIN_DIR = cfg.Paper_WHITE_TRAIN_DIR 
-        TEST_DIR = cfg.Paper_WHITE_VAL_DIR 
-
         TRAIN_FILE = cfg.Paper_WHITE_TRAIN_FILE 
         TEST_FILE = cfg.Paper_WHITE_VAL_FILE 
     else:
-        TRAIN_DIR = cfg.Own_WHITE_TRAIN_DIR 
-        TEST_DIR = cfg.Own_WHITE_VAL_DIR 
-
         TRAIN_FILE = cfg.Own_WHITE_TRAIN_FILE 
         TEST_FILE = cfg.Own_WHITE_VAL_FILE 
 else:
     if args.data=='paperdata':
-        TRAIN_DIR = cfg.Paper_BLACK_TRAIN_DIR 
-        TEST_DIR = cfg.Paper_BLACK_VAL_DIR 
-
         TRAIN_FILE = cfg.Paper_BLACK_TRAIN_FILE 
         TEST_FILE = cfg.Paper_BLACK_VAL_FILE 
     else:
-        TRAIN_DIR = cfg.Own_BLACK_TRAIN_DIR 
-        TEST_DIR = cfg.Own_BLACK_VAL_DIR 
-
         TRAIN_FILE = cfg.Own_BLACK_TRAIN_FILE 
         TEST_FILE = cfg.Own_BLACK_VAL_FILE 
 # Use CUDA
