@@ -5,6 +5,14 @@ from easydict import EasyDict
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__)))
 sys.path.append(PROJECT_ROOT)
 
+EXPERMENT_CONFIG = {
+        'on':False,
+        'alpha':False,
+        'network':True  
+}
+
+netstyle = 'conv3net'
+
 _C = EasyDict()
 cfg = _C 
 # detect hand anchor config 
@@ -25,9 +33,10 @@ _C.VIS_THRESH = 0.7
 
 # pretained model config
 _C.HAND_MODEL = os.path.join(PROJECT_ROOT,'weights','det_hand.pth')
-_C.KEY_WHITE_MODEL = os.path.join(PROJECT_ROOT,'weights','white_key4.pth')
-_C.KEY_BLACK_MODEL = os.path.join(PROJECT_ROOT,'weights','black_key2.pth')
-
+#_C.KEY_WHITE_MODEL = './weights/white_key_112_32.pth'
+_C.KEY_BLACK_MODEL = './weights/black_key_112_32.pth'
+_C.KEY_WHITE_MODEL = './weights/experments/network/record/white_conv3net.pth'
+#_C.KEY_BLACK_MODEL = './weights/experments/network/black_conv3net.pth'
 _C.MEAN = [0.45734706, 0.43338275, 0.40058118]
 _C.STD = [0.23965294, 0.23532275, 0.2398498]
 
@@ -35,44 +44,85 @@ _C.STD = [0.23965294, 0.23532275, 0.2398498]
 _C.KEY_NUM_CLASSES = 2 
 _C.WHITE_KEY_THRESH = 0.6
 _C.BLACK_KEY_THRESH = 0.6
-_C.NEAR_KEY_THRESH = 0.9
-_C.WHITE_BASE_CHANNEL = 16
-_C.BLACK_BASE_CHANNEL = 16
+_C.NEAR_KEY_THRESH = 0.95
+_C.WHITE_INPUT_CHANNEL = 1
+_C.BLACK_INPUT_CHANNEL = 1
+_C.WHITE_INPUT_SIZE = [112,32]
+_C.BLACK_INPUT_SIZE = [112,32]
+
 ##keyboard config 
-_C.KEYBOARD_MODEL = os.path.join(PROJECT_ROOT,'weights','keyboard1.pth')
+_C.KEYBOARD_MODEL = os.path.join(PROJECT_ROOT,'weights','keyboard.pth')
 _C.KEYBOARD_PALETTE = [0,0,0,64,0,128]
 _C.KEYBOARD_NUM_CLASSES = 2
 
 ## save file config 
-_C.SAVE_IMG_DIR = os.path.join('/home/data/lj/Piano','saved')
+if not EXPERMENT_CONFIG['on']:
+    _C.SAVE_IMG_DIR = os.path.join('/home/data/lj/Piano','saved')
+else:
+    if EXPERMENT_CONFIG['alpha']:
+        _C.SAVE_IMG_DIR = os.path.join('/home/data/lj/Piano','saved','experment','alpha','alpha3.0')
+    elif EXPERMENT_CONFIG['network']:
+        _C.SAVE_IMG_DIR = os.path.join('/home/data/lj/Piano','saved','experment','network',netstyle)
+
+## ['resnet','simple','conv3net']
+_C.WNetStyle = netstyle
+_C.BNetStyle = 'resnet'
 
 ## hand segment 
-_C.HAND_SEG_MODEL = os.path.join(PROJECT_ROOT,'weights','seg_hand1.pth')
+_C.HAND_SEG_MODEL = os.path.join(PROJECT_ROOT,'weights','seg_hand.pth')
 _C.HAND_SEG_PALETTE = [0,0,0,64,0,128]
 _C.HAND_SEG_NUM_CLASSES = 2
 
 ### vision 
 _C.VISION_DETECT = True 
 
+_C.HAND_LENGTH = 25
 ###evalute
 _C.EVALUATE_MAP = {
-        'originWhite':{'start_frame':245,'midi':'/home/data/gxdata/selfRecord/1120/originWhite.MID','fps':24,'midi_offset':1.5},
-        'originBlack':{'start_frame':156,'midi':'/home/data/gxdata/selfRecord/1120/originBlack.MID','fps':24,'midi_offset':1.5},
-        'ExtraLightBlack':{'start_frame':97,'midi':'/home/data/gxdata/selfRecord/1120/ExtraLightBlack.MID','fps':24,'midi_offset':1.5},
-        'ExtraLightWhite':{'start_frame':142,'midi':'/home/data/gxdata/selfRecord/1120/ExtraLightWhite.MID','fps':24,'midi_offset':1.5},
+        'middle_140':{'start_frame':201,'midi':'/home/data/gxdata/Record/1223_2/140.MID','fps':24,'midi_offset':1.5}, 
+        'middle_280':{'start_frame':164,'midi':'/home/data/gxdata/Record/1223_2/280.MID','fps':24,'midi_offset':1.5}, 
+        'middle_400':{'start_frame':79,'midi':'/home/data/gxdata/Record/1223_2/400.MID','fps':24,'midi_offset':1.5}, 
+        'middle_510':{'start_frame':173,'midi':'/home/data/gxdata/Record/1223_2/510.MID','fps':24,'midi_offset':1.5}, 
+        'middle_600':{'start_frame':161,'midi':'/home/data/gxdata/Record/1223_2/600.MID','fps':24,'midi_offset':1.5}, 
 
-        'extraLightWhite2':{'start_frame':105,'midi':'/home/data/gxdata/selfRecord/1121/extraLightWhite2.MID','fps':24,'midi_offset':1.5}, 
-        'extraLightBlack2':{'start_frame':83,'midi':'/home/data/gxdata/selfRecord/1121/extraLightBlack2.MID','fps':24,'midi_offset':1.5}, 
-        'random1':{'start_frame':164,'midi':'/home/data/gxdata/selfRecord/1121/random1.MID','fps':24,'midi_offset':1.5}, 
-        'random2':{'start_frame':174,'midi':'/home/data/gxdata/selfRecord/1121/random2.MID','fps':24,'midi_offset':1.5}, 
-        'random3':{'start_frame':161,'midi':'/home/data/gxdata/selfRecord/1121/random3.MID','fps':24,'midi_offset':1.5}, 
-        'random4':{'start_frame':173,'midi':'/home/data/gxdata/selfRecord/1121/random4.MID','fps':24,'midi_offset':1.5}, 
-        'x_lulu_-15':{'start_frame':121,'midi':'/home/data/gxdata/selfRecord/1121/x_lulu_-15.MID','fps':24,'midi_offset':1.5}, 
-        'x_mainchord_-15':{'start_frame':104,'midi':'/home/data/gxdata/selfRecord/1121/x_mainchord_-15.MID','fps':24,'midi_offset':1.5}, 
-        'x_random5_+15':{'start_frame':34,'midi':'/home/data/gxdata/selfRecord/1121/x_random5_+15.MID','fps':24,'midi_offset':1.5},
+        'left_140':{'start_frame':264,'midi':'/home/data/gxdata/Record/1223_2/140.MID','fps':24,'midi_offset':1.5}, 
+        'left_280':{'start_frame':210,'midi':'/home/data/gxdata/Record/1223_2/280.MID','fps':24,'midi_offset':1.5}, 
+        'left_400':{'start_frame':34,'midi':'/home/data/gxdata/Record/1223_2/400.MID','fps':24,'midi_offset':1.5}, 
+        'left_510':{'start_frame':125,'midi':'/home/data/gxdata/Record/1223_2/510.MID','fps':24,'midi_offset':1.5}, 
+        'left_600':{'start_frame':103,'midi':'/home/data/gxdata/Record/1223_2/600.MID','fps':24,'midi_offset':1.5}, 
 
-        'blackWhite':{'start_frame':52,'midi':'/home/data/gxdata/selfRecord/1126/blackWhite.MID','fps':25,'midi_offset':1.5},
-        'Chord':{'start_frame':93,'midi':'/home/data/gxdata/selfRecord/1126/Chord.MID','fps':25,'midi_offset':1.5},
+        'right_140':{'start_frame':112,'midi':'/home/data/gxdata/Record/1223_2/140.MID','fps':24,'midi_offset':1.5}, 
+        'right_280':{'start_frame':95,'midi':'/home/data/gxdata/Record/1223_2/280.MID','fps':24,'midi_offset':1.5}, 
+        'right_400':{'start_frame':127,'midi':'/home/data/gxdata/Record/1223_2/400.MID','fps':24,'midi_offset':1.5}, 
+        'right_510':{'start_frame':240,'midi':'/home/data/gxdata/Record/1223_2/510.MID','fps':24,'midi_offset':1.5}, 
+        'right_600':{'start_frame':230,'midi':'/home/data/gxdata/Record/1223_2/600.MID','fps':24,'midi_offset':1.5}, 
+
+        '1_baseline':{'start_frame':140,'midi':'/home/data/gxdata/Record/1225/1_baseline.MID','fps':24,'midi_offset':1.5}, 
+        '1_right_260':{'start_frame':66,'midi':'/home/data/gxdata/Record/1225/1_right_260.MID','fps':24,'midi_offset':1.5}, 
+        '1_right_400':{'start_frame':84,'midi':'/home/data/gxdata/Record/1225/1_right_400.MID','fps':24,'midi_offset':1.5}, 
+        '1_right_520':{'start_frame':168,'midi':'/home/data/gxdata/Record/1225/1_right_520.MID','fps':24,'midi_offset':1.5}, 
+        '1_right_630':{'start_frame':72,'midi':'/home/data/gxdata/Record/1225/1_right_630.MID','fps':24,'midi_offset':1.5}, 
+        '1_right_730':{'start_frame':59,'midi':'/home/data/gxdata/Record/1225/1_right_730.MID','fps':24,'midi_offset':1.5},
+
+        '2_baseline':{'start_frame':94,'midi':'/home/data/gxdata/Record/1225/2_baseline.MID','fps':24,'midi_offset':1.5}, 
+        '2_right_280':{'start_frame':67,'midi':'/home/data/gxdata/Record/1225/2_right_280.MID','fps':24,'midi_offset':1.5},
+        '2_right_400':{'start_frame':58,'midi':'/home/data/gxdata/Record/1225/2_right_420.MID','fps':24,'midi_offset':1.5}, 
+        '2_right_520':{'start_frame':55,'midi':'/home/data/gxdata/Record/1225/2_right_520.MID','fps':24,'midi_offset':1.5}, 
+        '2_right_630':{'start_frame':65,'midi':'/home/data/gxdata/Record/1225/2_right_630.MID','fps':24,'midi_offset':1.5}, 
+        '2_right_730':{'start_frame':49,'midi':'/home/data/gxdata/Record/1225/2_right_730.MID','fps':24,'midi_offset':1.5}, 
+
+        '3_middle_260':{'start_frame':121,'midi':'/home/data/gxdata/Record/1225/3_middle_260.MID','fps':24,'midi_offset':1.5}, 
+        '3_middle_400':{'start_frame':51,'midi':'/home/data/gxdata/Record/1225/3_middle_400.MID','fps':24,'midi_offset':1.5},
+        '3_middle_530':{'start_frame':46,'midi':'/home/data/gxdata/Record/1225/3_middle_530.MID','fps':24,'midi_offset':1.5}, 
+        '3_middle_690':{'start_frame':70,'midi':'/home/data/gxdata/Record/1225/3_middle_690.MID','fps':24,'midi_offset':1.5}, 
+        '3_middle_800':{'start_frame':55,'midi':'/home/data/gxdata/Record/1225/3_middle_800.MID','fps':24,'midi_offset':1.5},
+
+        '4_left_240':{'start_frame':99,'midi':'/home/data/gxdata/Record/1225/4_left_240.MID','fps':24,'midi_offset':1.5}, 
+        '4_left_390':{'start_frame':85,'midi':'/home/data/gxdata/Record/1225/4_left_390.MID','fps':24,'midi_offset':1.5}, 
+        '4_left_520':{'start_frame':68,'midi':'/home/data/gxdata/Record/1225/4_left_520.MID','fps':24,'midi_offset':1.5}, 
+        '4_left_620':{'start_frame':28,'midi':'/home/data/gxdata/Record/1225/4_left_620.MID','fps':24,'midi_offset':1.5}, 
+        '4_left_730':{'start_frame':55,'midi':'/home/data/gxdata/Record/1225/4_left_730.MID','fps':24,'midi_offset':1.5}, 
+
 
         'V1':{'start_frame':98,'midi':'/home/data/lj/Piano/paperData/IWSSIP/TestSet/OriginalVideos/V1.wmv.mid','fps':20,'midi_offset':0}, 
         'V2':{'start_frame':72,'midi':'/home/data/lj/Piano/paperData/IWSSIP/TestSet/OriginalVideos/V2.wmv.mid','fps':20,'midi_offset':0}, 
@@ -85,3 +135,4 @@ _C.EVALUATE_MAP = {
         'V9':{'start_frame':122,'midi':'/home/data/lj/Piano/paperData/IWSSIP/TestSet/OriginalVideos/V9.wmv.mid','fps':20,'midi_offset':0}, 
         'V10':{'start_frame':85,'midi':'/home/data/lj/Piano/paperData/IWSSIP/TestSet/OriginalVideos/V10.wmv.mid','fps':20,'midi_offset':0}, 
 }
+

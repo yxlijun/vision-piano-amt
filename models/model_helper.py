@@ -14,7 +14,9 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__),'..'))
 sys.path.insert(0,PROJECT_ROOT)
 from config import cfg 
 from .hand_model import build_s3fd 
-from .keys_model import ResNet18 
+from .simple import SimpleNet
+from .resnet_112_32 import ResNet18 as ResNet18_112 
+from .conv3net import Conv3Net
 from IPython import embed 
 
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
@@ -29,26 +31,35 @@ def to_chw_bgr(image):
 
 
 class ModelProduct(object):
-    def __init__(self):
+    def __init__(self,white_model_file=None,black_model_file=None):
         self.load_det_hand_model() 
-        self.load_white_key_model()
-        self.load_black_key_model()
+        self.load_white_key_model(white_model_file)
+        self.load_black_key_model(black_model_file)
         #print('->>finish det hand model load')
         #print('->>finish whitekey model load')
         #print('->>finish blackkey model load')
 
-
-        self.transform_white = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            #transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+        if cfg.WHITE_INPUT_CHANNEL==3:
+            self.transform_white = transforms.Compose([
+                transforms.Resize(cfg.WHITE_INPUT_SIZE),
+                transforms.ToTensor(),
             ])
-
-        self.transform_black = transforms.Compose([
-            transforms.Grayscale(),
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            #transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+        else:
+            self.transform_white = transforms.Compose([
+                transforms.Grayscale(),
+                transforms.Resize(cfg.WHITE_INPUT_SIZE),
+                transforms.ToTensor(),
+            ])
+        if cfg.BLACK_INPUT_CHANNEL==3:
+            self.transform_black = transforms.Compose([
+                transforms.Resize(cfg.BLACK_INPUT_SIZE),
+                transforms.ToTensor(),
+            ])
+        else:
+            self.transform_black = transforms.Compose([
+                transforms.Grayscale(),
+                transforms.Resize(cfg.BLACK_INPUT_SIZE),
+                transforms.ToTensor(),
             ])
         
     def load_det_hand_model(self):
@@ -59,35 +70,59 @@ class ModelProduct(object):
             self.hand_net.cuda()
         cudnn.benchmark = True 
 
-    def load_white_key_model(self):
-        self.white_key_net = ResNet18(input_channel=3,
-                                    base_channel=cfg.WHITE_BASE_CHANNEL,
-                                    num_classes=cfg.KEY_NUM_CLASSES)
-        self.white_key_net.load_state_dict(torch.load(cfg.KEY_WHITE_MODEL))
+    def load_white_key_model(self,white_model_file): 
+        if cfg.WNetStyle=='resnet':
+            self.white_key_net = ResNet18_112(input_channel=cfg.WHITE_INPUT_CHANNEL,
+                                        base_channel=16,
+                                        num_classes=cfg.KEY_NUM_CLASSES)
+        elif cfg.WNetStyle =='simple':
+            self.white_key_net = SimpleNet(input_channel=cfg.WHITE_INPUT_CHANNEL,
+                                        num_classes=cfg.KEY_NUM_CLASSES)
+        else:
+            self.white_key_net = Conv3Net(input_channel=cfg.WHITE_INPUT_CHANNEL,
+                                        num_classes=cfg.KEY_NUM_CLASSES)
+        if white_model_file is None:
+            self.white_key_net.load_state_dict(torch.load(cfg.KEY_WHITE_MODEL))
+        else:
+            self.white_key_net.load_state_dict(torch.load(white_model_file))
         self.white_key_net.eval()
         if torch.cuda.is_available():
             self.white_key_net.cuda()
 
-    def load_black_key_model(self):
-        self.black_key_net = ResNet18(input_channel = 1,
-                                     base_channel=cfg.BLACK_BASE_CHANNEL,
-                                     num_classes = cfg.KEY_NUM_CLASSES)
-        self.black_key_net.load_state_dict(torch.load(cfg.KEY_BLACK_MODEL))
+    def load_black_key_model(self,black_model_file): 
+        if cfg.BNetStyle=='resnet':
+            self.black_key_net = ResNet18_112(input_channel = cfg.BLACK_INPUT_CHANNEL,
+                                         base_channel=16,
+                                         num_classes = cfg.KEY_NUM_CLASSES)
+        elif cfg.BNetStyle=='simple':
+            self.black_key_net = SimpleNet(input_channel = cfg.BLACK_INPUT_CHANNEL,
+                                         num_classes = cfg.KEY_NUM_CLASSES,type='black')
+        else:
+             self.black_key_net = Conv3Net(input_channel = cfg.BLACK_INPUT_CHANNEL,
+                                         num_classes = cfg.KEY_NUM_CLASSES,type='black')
+        if black_model_file is None:
+            self.black_key_net.load_state_dict(torch.load(cfg.KEY_BLACK_MODEL))
+        else:
+            self.black_key_net.load_state_dict(torch.load(black_model_file))
         self.black_key_net.eval()
         if torch.cuda.is_available():
             self.black_key_net.cuda()
 
     def detect_white_keys(self,imgs,debug=False):
         inputs = list()
+        t1 = time.time()
         with torch.no_grad():
             for img in imgs:
                 img = self.transform_white(img).unsqueeze(0)
                 img = img.cuda()
                 inputs.append(img)
             inputs = torch.cat(inputs,dim=0)
+            #print('preprocess cost {}'.format(time.time()-t1))
+            t1 = time.time()
             output = self.white_key_net(inputs)
             prob = F.softmax(output, dim=1)   #----按行softmax,行的和概率为1,每个元素代表着概
             prob = prob.cpu().numpy()
+            #print('detect cost {}'.format(time.time()-t1))
             result = (prob[:,1]>cfg.WHITE_KEY_THRESH).astype(int)
             pred = np.where(prob[:,1]>cfg.WHITE_KEY_THRESH)[0]
             if debug:
@@ -117,7 +152,7 @@ class ModelProduct(object):
             result = (prob[:,1]>cfg.BLACK_KEY_THRESH).astype(int)
             if debug:
                 embed()
-        return result 
+        return result,prob[:,1]
 
     def detect_hand(self,img,Rect):
         if img.mode == 'L':

@@ -83,7 +83,7 @@ class KeyBoard(object):
         if not warp_result['flag']:return warp_result
         if warp_result['keyboard_rect'] is not None: return warp_result
         warp_img = warp_result['warp_img']
-
+        
         img = Image.fromarray(cv2.cvtColor(warp_img,cv2.COLOR_BGR2RGB))
         prediction = self.inference(img)
         fin_result = self.post_process2(img,prediction)
@@ -114,12 +114,12 @@ class KeyBoard(object):
         locy_min,locy_max = 0,0
         for y in loc_y:
             cmask = np.where(pmask[y]!=0)[0]
-            if len(cmask)>0.5*width:
+            if len(cmask)>0.3*width:
                 locy_min = y 
                 break 
         for y in loc_y[::-1]:
             cmask = np.where(pmask[y]!=0)[0]
-            if len(cmask)>0.5*width:
+            if len(cmask)>0.3*width:
                 locy_max = y 
                 break 
         piano_ylen = locy_max-locy_min 
@@ -163,8 +163,8 @@ class KeyBoard(object):
         result = {}
         rect = order_points(contours)
         if len(contours)>500:
-            lt,rt,rb,lb = rect
-            if abs(lt[1]-rt[1])>5 or abs(rb[1]-rt[1])>5:
+            lt,rt,rb,lb = rect            
+            if abs(lt[1]-rt[1])>5 or abs(rb[1]-lb[1])>5:
                 xb1,yb1,xb2,yb2 = lb[0],lb[1],rb[0],rb[1]
                 xt1,yt1,xt2,yt2 = lt[0],lt[1],rt[0],rt[1]
                 center = (w//2,h//2)
@@ -208,7 +208,7 @@ class KeyBoard(object):
         rect = order_points(contours)
         if len(contours)>500:
             lt,rt,rb,lb = rect
-            if abs(lt[1]-rt[1])>5 or abs(rb[1]-rt[1])>5:
+            if abs(lt[1]-rt[1])>5 or abs(rb[1]-lb[1])>5:
                 xb1,yb1,xb2,yb2 = lb[0],lb[1],rb[0],rb[1]
                 xt1,yt1,xt2,yt2 = lt[0],lt[1],rt[0],rt[1]
                 if abs(yb1-yb2)>abs(yt1-yt2):

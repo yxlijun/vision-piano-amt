@@ -397,6 +397,7 @@ def vertify_press_white(key_index,
     bend = int(box[1]+box[3])
     wc = int((cx1+cx2)/2)
     length = len(np.where(mask[0:bend,wc]!=0)[0])
+    '''
     if length<50:
         for index in bindex:
             box = black_boxes[index-1]
@@ -407,10 +408,22 @@ def vertify_press_white(key_index,
             for i in range(ystart,yend):
                 if mask[i,xcenter]!=0:
                     count+=1 
-            if count>2 and prob<0.9:
+            if count>2 and prob<0.85:
                 return False,0 
-            elif count>2:
-                return False,1 
+            #elif count>2:
+            #    return False,1 
+    '''
+    for index in bindex:
+        box = black_boxes[index-1]
+        xcenter = int(box[0]+box[2]/2.0)
+        ystart = int(box[1])
+        yend = int(box[1]+box[3])
+        count = 0
+        for i in range(ystart,yend):
+            if mask[i,xcenter]!=0:
+                count+=1 
+        if count>2 and prob<0.8:
+            return False,0 
     white1,white2 = white_loc[key_index-1],white_loc[key_index]
     for box in hand_boxes:
         x1,x2 = box[0][0],box[1][0]
@@ -450,8 +463,9 @@ def find_base_img(keyboard_model,
                   img_list):
     base_img,rect = None,None 
     count_frame = 0 
-    result = {'base_img':base_img,'count_frame':count_frame,'rect':rect,'rote_M':None,'warp_M':None}
+    result = {'base_img':base_img,'img':None,'count_frame':count_frame,'rect':rect,'rote_M':None,'warp_M':None}
     for img_path in img_list:
+        print(img_path)
         img = Image.open(img_path)
         w,h = img.size 
         count_frame+=1 
@@ -463,7 +477,7 @@ def find_base_img(keyboard_model,
             rect = keyboard_info['keyboard_rect']
             base_img = opencv_img[rect[1]:rect[3],rect[0]:rect[2]]
             hand_boxes = modelproduct.detect_hand(img,rect)
-            result = {'base_img':base_img,
+            result = {'base_img':base_img,'img':opencv_img,
                     'count_frame':count_frame,
                     'rect':rect,'rote_M':None,'warp_M':None} 
         else:
@@ -475,7 +489,7 @@ def find_base_img(keyboard_model,
                 base_img = rotated_img[rect[1]:rect[3],rect[0]:rect[2]]
                 img = Image.fromarray(cv2.cvtColor(rotated_img,cv2.COLOR_BGR2RGB))
                 hand_boxes = modelproduct.detect_hand(img,rect)
-                result = {'base_img':base_img,
+                result = {'base_img':base_img,'img':rotated_img,
                     'count_frame':count_frame,
                     'rect':rect,'rote_M':rote_M,'warp_M':None}
             else:
@@ -487,7 +501,7 @@ def find_base_img(keyboard_model,
                 base_img = warp_img[rect[1]:rect[3],rect[0]:rect[2]]
                 img = Image.fromarray(cv2.cvtColor(warp_img,cv2.COLOR_BGR2RGB))
                 hand_boxes = modelproduct.detect_hand(img,rect)
-                result = {'base_img':base_img,
+                result = {'base_img':base_img,'img':warp_img,
                     'count_frame':count_frame,
                     'rect':rect,'rote_M':rote_M,'warp_M':warp_M}
         if len(hand_boxes)==0:return result  
@@ -497,7 +511,7 @@ def find_base_img(keyboard_model,
         if len(hand_boxes)>1:
             hand_xmin1,hand_ymin1 = hand_boxes[0][0][0],hand_boxes[0][0][1]
             hand_xmin2,hand_ymin2 = hand_boxes[1][0][0],hand_boxes[1][0][1]
-            if hand_ymin1>rect[3]+5 or hand_ymin2>rect[3]+5:return result 
+            if hand_ymin1>rect[3]+5 and hand_ymin2>rect[3]+5:return result 
     return result 
     
 def find_key_loc(bwlabel_model,
@@ -512,11 +526,12 @@ def find_video_base_img(keyboard_model,
     base_img,rect = None,None 
     count_frame = 0
     capture = cv2.VideoCapture(video_file)
-    result = {'base_img':base_img,'count_frame':count_frame,'rect':rect,'rote_M':None,'warp_M':None}
+    result = {'base_img':base_img,'img':None,'count_frame':count_frame,'rect':rect,'rote_M':None,'warp_M':None}
     if not capture.isOpened():
         return result 
     while True:
         ret,frame = capture.read()
+        h,w,_ = frame.shape
         count_frame+=1 
         if not ret:
             break 
@@ -529,7 +544,7 @@ def find_video_base_img(keyboard_model,
             rect = keyboard_info['keyboard_rect']
             base_img = opencv_img[rect[1]:rect[3],rect[0]:rect[2]]
             hand_boxes = modelproduct.detect_hand(img,rect)
-            result = {'base_img':base_img,
+            result = {'base_img':base_img,'img':opencv_img,
                     'count_frame':count_frame,
                     'rect':rect,'rote_M':None,'warp_M':None} 
         else:
@@ -541,7 +556,7 @@ def find_video_base_img(keyboard_model,
                 base_img = rotated_img[rect[1]:rect[3],rect[0]:rect[2]]
                 img = Image.fromarray(cv2.cvtColor(rotated_img,cv2.COLOR_BGR2RGB))
                 hand_boxes = modelproduct.detect_hand(img,rect)
-                result = {'base_img':base_img,
+                result = {'base_img':base_img,'img':rotated_img,
                     'count_frame':count_frame,
                     'rect':rect,'rote_M':rote_M,'warp_M':None}
             else:
@@ -553,7 +568,7 @@ def find_video_base_img(keyboard_model,
                 base_img = warp_img[rect[1]:rect[3],rect[0]:rect[2]]
                 img = Image.fromarray(cv2.cvtColor(warp_img,cv2.COLOR_BGR2RGB))
                 hand_boxes = modelproduct.detect_hand(img,rect)
-                result = {'base_img':base_img,
+                result = {'base_img':base_img,'img':warp_img,
                     'count_frame':count_frame,
                     'rect':rect,'rote_M':rote_M,'warp_M':warp_M}
         if len(hand_boxes)==0:
@@ -567,7 +582,7 @@ def find_video_base_img(keyboard_model,
         if len(hand_boxes)>1:
             hand_xmin1,hand_ymin1 = hand_boxes[0][0][0],hand_boxes[0][0][1]
             hand_xmin2,hand_ymin2 = hand_boxes[1][0][0],hand_boxes[1][0][1]
-            if hand_ymin1>rect[3]+5 or hand_ymin2>rect[3]+5:
+            if hand_ymin1>rect[3]+5 and hand_ymin2>rect[3]+5:
                 capture.release()
                 return result 
     capture.release()

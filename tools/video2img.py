@@ -3,10 +3,11 @@ import cv2
 from PIL import Image
 import numpy as np
 import argparse 
+from tqdm import tqdm 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--video',type=str)
-parser.add_argument('--root',type=str)
+parser.add_argument('--video',type=str,default=None)
+parser.add_argument('--root',type=str,default=None)
 args = parser.parse_args()
 
 def img2video(path,size=(1280,720)):
@@ -25,21 +26,24 @@ def img2video(path,size=(1280,720)):
 
 
 def readvideo2flipvideo(video_path,save_path):
+    print(video_path)
     save_img_dir = os.path.join(os.path.split(save_path)[0],'images',os.path.basename(save_path).split('.')[0])
     if not os.path.exists(save_img_dir):
         os.makedirs(save_img_dir)
+    else:return 
     capture = cv2.VideoCapture(video_path)
     if not capture.isOpened():
         raise ValueError('read video wrong')
     fps = capture.get(cv2.CAP_PROP_FPS)
-    print(fps)
-    return 
+    total_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+    #print(fps)
+    #return 
     size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), 
             int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     fourcc = cv2.VideoWriter_fourcc('m','p','4','v')
     videowriter = cv2.VideoWriter(save_path,fourcc=fourcc,fps=fps,frameSize=size)
     count = 0
-    while True:
+    for idx in tqdm(range(total_frames)):
         ret,frame = capture.read()
         if not ret:
             break 
@@ -66,6 +70,7 @@ def list_wmvdir(path,wmv_files):
 
 def main(wmv_files):
     if isinstance(wmv_files,list):
+        wmv_files.sort()
         for video_path in wmv_files:
             if 'wmv' in video_path:
                 save_path = video_path.replace('wmv','mp4')
@@ -73,13 +78,15 @@ def main(wmv_files):
                 save_path = video_path.replace('MP4','mp4')
             readvideo2flipvideo(video_path,save_path)
     else:
-        save_path = os.path.splitext(wmv_files)[0]+'_tran.mp4'
+        save_path = wmv_files.replace('MP4','mp4')
         print(save_path)
         readvideo2flipvideo(wmv_files,save_path)
         
 
 if __name__=='__main__':
-    train_files = []
-    list_wmvdir(args.root,train_files)
-    main(train_files)
-    #main(args.video)
+    if args.root is not None: 
+        train_files = []
+        list_wmvdir(args.root,train_files)
+        main(train_files)
+    if args.video is not None:
+        main(args.video)

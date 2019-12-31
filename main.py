@@ -8,10 +8,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--img_dir',type=str,default=None)
 parser.add_argument('--video',type=str,default=None)
 parser.add_argument('--img_root',type=str,default=None)
+parser.add_argument('--type',type=str,default='record',choices=['paper','record'])
 args = parser.parse_args()
 
 
-if __name__=='__main__': 
+if __name__=='__main__':
     if args.img_dir is not None:
         if args.img_dir[-1]=='/':
             args.img_dir = args.img_dir[0:-1]
@@ -23,7 +24,7 @@ if __name__=='__main__':
             fps = cfg.EVALUATE_MAP[file_mark]['fps']
             midi_offset = cfg.EVALUATE_MAP[file_mark]['midi_offset']
 
-        visamthelper = VisAmtHelper(file_mark,midi,start_frame,fps,midi_offset)
+        visamthelper = VisAmtHelper(file_mark,midi,start_frame,fps,midi_offset,music_type=args.type)
         visamthelper.process_img_dir(args.img_dir)
 
     if args.video is not None:
@@ -43,8 +44,11 @@ if __name__=='__main__':
         B_frame_recall,B_frame_priecies,B_frame_F = 0,0,0
         W_note_recall,W_note_precies,W_note_F = 0,0,0
         B_note_recall,B_note_precies,B_note_F = 0,0,0
+        img_dir_lists.sort()
         for img_dir in img_dir_lists:
             print(img_dir)
+            save_dir = os.path.join(cfg.SAVE_IMG_DIR,os.path.basename(img_dir))
+            #if os.path.exists(save_dir):continue
             if img_dir[-1]=='/':
                 img_dir = img_dir[0:-1]
             file_mark = img_dir.split('/')[-1]
@@ -54,7 +58,7 @@ if __name__=='__main__':
                 start_frame = cfg.EVALUATE_MAP[file_mark]['start_frame']
                 fps = cfg.EVALUATE_MAP[file_mark]['fps']
                 midi_offset = cfg.EVALUATE_MAP[file_mark]['midi_offset']
-            visamthelper = VisAmtHelper(file_mark,midi,start_frame,fps,midi_offset)    
+            visamthelper = VisAmtHelper(file_mark,midi,start_frame,fps,midi_offset,music_type=args.type)     
             visamthelper.process_img_dir(img_dir)
             if visamthelper.frame_result is not None:
                 frame_result = visamthelper.frame_result 

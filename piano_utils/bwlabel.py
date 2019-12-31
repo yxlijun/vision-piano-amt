@@ -134,7 +134,7 @@ class BwLabel(object):
             elif len(black_loc)<36:
                 thresh+=1
             else:
-                break 
+                break
             if thresh<90 or thresh>150:
                 break
         return black_boxes,black_loc 

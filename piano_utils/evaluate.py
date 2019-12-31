@@ -5,7 +5,10 @@ import argparse
 import os
 import shutil
 import mido
-from IPython import embed 
+from IPython import embed
+import sys 
+sys.path.append(os.path.abspath('.'))
+from config import cfg 
 
 class Accuracy(object):
     def __init__(self, 
@@ -16,7 +19,7 @@ class Accuracy(object):
                 start_frame = 0,
                 midi_offset = 1.5,
                 frameOffset=2, 
-                tolerance=0.5):
+                tolerance=0.15):
         self.midiPath = midiPath
         self.w_detectPath = w_detectPath
         self.b_detectPath = b_detectPath
@@ -25,6 +28,7 @@ class Accuracy(object):
         self.pitch_onset = self.processMidi(self.midiPath,self.offTime,midi_offset)  
         self.frameOffset = frameOffset  #前面两帧没出现则认为是新的note
         self.tolerance = tolerance  #误差计算误差为2s
+        self.tol_frame = 2
 
         self.black_num = [2, 5, 7, 10, 12, 14, 17, 19, 22, 24, 26, 29,
                           31, 34, 36, 38, 41, 43, 46, 48, 50, 53, 55, 58,
@@ -55,7 +59,7 @@ class Accuracy(object):
                 'white':{'precies':self.notew_precies,'recall':self.notew_recall,'F':self.notew_F}
         }
         return result 
-    
+   
     def processMidi(self, midiPath, offTime, midi_offset):
         mid = mido.MidiFile(midiPath)
         timeCount = 0
@@ -85,7 +89,7 @@ class Accuracy(object):
             po = [item[2] - midi_offset + offTime, item[0]]
             pitch_onset.append(po)
         pitch_onset = sorted(pitch_onset, key=lambda x: (x[0], x[1]))
-        
+        #print(pitch_onset) 
         self.pitch_onset_offset = []
         for item in result:
             po = [item[2] - midi_offset + offTime, item[3] - midi_offset + offTime,item[0]]
@@ -140,7 +144,9 @@ class Accuracy(object):
             key = []
             line = line.strip().split()
             filenames.append(line[0])
-            times.append(float(line[1]))
+            frame = int(os.path.basename(line[0]).split('.')[0])
+            #times.append(float(line[1]))
+            times.append(float(frame*self.pframe_time))
             for j in range(2, len(line)):
                 key.append(int(line[j]))
             keys.append(key)
@@ -173,7 +179,7 @@ class Accuracy(object):
                         count = 0
                         for j in range(i+1,end):
                             if pressed_key in keys[j]:count+=1
-                        if count>=2:
+                        if count>=1:
                             data = [times[i], pressed_key]
                             pro_onset.append(data)
                     else:
@@ -181,7 +187,7 @@ class Accuracy(object):
                         count = 0
                         for j in range(i+1,end):
                             if pressed_key in keys[j]:count+=1
-                        if count==1:
+                        if count>=1:
                             data = [times[i], pressed_key]
                             pro_onset.append(data)
         if len(keys)>0:
@@ -256,7 +262,7 @@ class Accuracy(object):
         pitch_white = [[line[0],self.white_num.index(line[1]) + 1]
                         for line in self.pitch_onset if line[1] in self.white_num]
         self.notew_precies, self.notew_recall, W_keys_pres,W_keys_recall = self.cuont_acu(pitch_white, self.w_pro_onset)
-        self.notew_F = self.cal_F(self.notew_recall,self.noteb_precies)
+        self.notew_F = self.cal_F(self.notew_recall,self.notew_precies)
         data = 'note white\tprecies:{:.2}\trecall:{:.2}\tFscore:{:.2}'.format(self.notew_precies,self.notew_recall,self.notew_F)
         self.evalout.write(data+'\n')
         print(data)
@@ -280,7 +286,7 @@ class Accuracy(object):
         F = self.cal_F(conf1,conf2)
         data = 'note total\tprecies:{:.2}\trecall:{:.2}\tFscore:{:.2}'.format(conf1,conf2,F)
         self.evalout.write(data)
-        print(data)
+        #print(data)
         return conf1, conf2
     
     
@@ -296,28 +302,31 @@ class Accuracy(object):
                 for j in range(2, len(line)):
                     if int(line[j])>0:
                         keys.append(int(line[j]))
-                        frames.append(frame)
+                        frames.append(frame) 
             return frames,keys 
 
         def cal_acc(det_frames,det_keys,midi_frames,midi_keys):
             recall_count = 0 
-            precall_count = 0
+            precise_count = 0
             for idx,mframe in enumerate(midi_frames):
                 match = False 
                 for idy,dframe in enumerate(det_frames):
-                    if abs(mframe-dframe)<=5 and det_keys[idy]==midi_keys[idx]:
+                    if abs(mframe-dframe)<=self.tol_frame and det_keys[idy]==midi_keys[idx]:
                         match = True 
                 if match:recall_count+=1
-
             for idx,dframe in enumerate(det_frames):
                 match = False 
                 for idy,mframe in enumerate(midi_frames):
-                    if abs(mframe-dframe)<=5 and det_keys[idx]==midi_keys[idy]:
+                    if abs(mframe-dframe)<=self.tol_frame and det_keys[idx]==midi_keys[idy]:
                         match = True 
-                if match:precall_count+=1 
+                if match:precise_count+=1
 
-            precise = precall_count/len(det_frames)
-            recall = recall_count/len(midi_frames)
+            precise,recall = 0.0,0.0
+            if len(det_frames)>0:
+                precise = precise_count/len(det_frames)
+            if len(midi_frames)>0:
+                recall = recall_count/len(midi_frames)
+
             F = self.cal_F(recall,precise)
             return precise,recall,F 
 
@@ -328,14 +337,14 @@ class Accuracy(object):
             end_frame = round(pof[1]/self.pframe_time)
             
             if pof[2] in self.black_num:
-                for frame in range(start_frame,end_frame+1):
+                for frame in range(start_frame,end_frame):
                     midi_black_frames.append(frame)
                     midi_black_keys.append(self.black_num.index(pof[2])+1)
             else:
-                for frame in range(start_frame,end_frame+1):
+                for frame in range(start_frame,end_frame):
                     midi_white_frames.append(frame)
                     midi_white_keys.append(self.white_num.index(pof[2])+1)
-         
+
         det_white_frames,det_white_keys = parse_detect_file(self.w_detectPath)
         det_black_frames,det_black_keys = parse_detect_file(self.b_detectPath)
         
@@ -353,7 +362,58 @@ class Accuracy(object):
       
 
 if __name__ == '__main__':
-    w_detectPath = '/home/data/lj/Piano/saved/V1/pitch_white.txt'
-    b_detectPath = '/home/data/lj/Piano/saved/V1/pitch_black.txt'
-    midiPath = '/home/data/lj/Piano/paperData/IWSSIP/TestSet/OriginalVideos/V1.wmv.mid'
-    Acu = Accuracy(midiPath, w_detectPath, b_detectPath,start_frame=98,pframe_time=1/20.0,midi_offset=0.0)
+    #eval_record = ['V1','V2','V3','V4','V5','V6','V7','V8','V9','V10']
+
+    #eval_record = ['left_140','left_280','left_400','left_510','left_600']
+    #eval_record = ['middle_140','middle_280','middle_400','middle_510','middle_600']
+    #eval_record = ['right_140','right_280','right_400','right_510','right_600']
+
+    #eval_record = ['1_baseline','1_right_260','1_right_400','1_right_520','1_right_630','1_right_730']
+    #eval_record = ['2_baseline','2_right_280','2_right_400','2_right_520','2_right_630','2_right_730']
+    #eval_record = ['3_middle_260','3_middle_400','3_middle_530','3_middle_690','3_middle_800']
+    #eval_record = ['4_left_240','4_left_390','4_left_520','4_left_620','4_left_730']
+    eval_record = ['middle_140','middle_280','middle_400','middle_510','middle_600','3_middle_260','3_middle_400','3_middle_530','3_middle_690','3_middle_800']
+    W_frame_recall,W_frame_precies,W_frame_F = 0,0,0
+    B_frame_recall,B_frame_priecies,B_frame_F = 0,0,0
+    W_note_recall,W_note_precies,W_note_F = 0,0,0
+    B_note_recall,B_note_precies,B_note_F = 0,0,0
+
+    for rec in eval_record:
+        if rec in cfg.EVALUATE_MAP.keys():
+            print(rec)
+            w_detectPath = '/home/data/lj/Piano/saved/experment/alpha4.0/{}/pitch_white.txt'.format(rec)
+            b_detectPath = '/home/data/lj/Piano/saved/{}/pitch_black.txt'.format(rec)
+            if not os.path.exists(w_detectPath):continue 
+            midiPath = cfg.EVALUATE_MAP[rec]['midi']
+            fps = cfg.EVALUATE_MAP[rec]['fps']
+            midi_offset = cfg.EVALUATE_MAP[rec]['midi_offset']
+            start_frame = cfg.EVALUATE_MAP[rec]['start_frame']
+            Acu = Accuracy(midiPath, w_detectPath, b_detectPath,start_frame=start_frame,pframe_time=1/fps,midi_offset=midi_offset)
+            frame_result = Acu.get_frame_result()
+            note_result = Acu.get_note_result()
+            wf_rec,wf_prec,wf_F = frame_result['white']['recall'],frame_result['white']['precies'],frame_result['white']['F']
+            bf_rec,bf_prec,bf_F = frame_result['black']['recall'],frame_result['black']['precies'],frame_result['black']['F']
+            wn_rec,wn_prec,wn_F = note_result['white']['recall'],note_result['white']['precies'],note_result['white']['F']
+            bn_rec,bn_prec,bn_F = note_result['black']['recall'],note_result['black']['precies'],note_result['black']['F']
+            W_frame_recall+=wf_rec 
+            W_frame_precies+=wf_prec 
+            W_frame_F+=wf_F 
+            B_frame_recall+=bf_rec 
+            B_frame_priecies+=bf_prec 
+            B_frame_F+=bf_F 
+            W_note_recall+=wn_rec 
+            W_note_precies+=wn_prec 
+            W_note_F+=wn_F 
+            B_note_recall+=bn_rec 
+            B_note_precies+=bn_prec 
+            B_note_F+=bn_F 
+    img_len = len(eval_record)
+    W_frame_recall,W_frame_precies,W_frame_F = W_frame_recall/img_len,W_frame_precies/img_len,W_frame_F/img_len 
+    B_frame_recall,B_frame_priecies,B_frame_F = B_frame_recall/img_len,B_frame_priecies/img_len,B_frame_F/img_len 
+    W_note_recall,W_note_precies,W_note_F = W_note_recall/img_len,W_note_precies/img_len,W_note_F/img_len 
+    B_note_recall,B_note_precies,B_note_F = B_note_recall/img_len,B_note_precies/img_len,B_note_F/img_len 
+    print('avg frame black\tprecies:{:.2}\trecall:{:.2}\tFscore:{:.2}'.format(B_frame_priecies,B_frame_recall,B_frame_F))
+    print('avg frame white\tprecies:{:.2}\trecall:{:.2}\tFscore:{:.2}'.format(W_frame_precies,W_frame_recall,W_frame_F))
+    print('avg note black\tprecies:{:.2}\trecall:{:.2}\tFscore:{:.2}'.format(B_note_precies,B_note_recall,B_note_F))
+    print('avg note white\tprecies:{:.2}\trecall:{:.2}\tFscore:{:.2}'.format(W_note_precies,W_note_recall,W_note_F))
+
