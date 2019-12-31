@@ -11,7 +11,6 @@ from seghand import SegHand,detect_hand_by_diffimg
 from evaluate import Accuracy
 from PIL import Image 
 from tools.helper import * 
-from tools.warper import *
 from IPython import embed
 from tqdm import tqdm 
 import time 
