@@ -18,8 +18,7 @@ sys.path.insert(0,os.path.abspath(__file__))
 
 from networks import PSPNet
 from config import cfg 
-from util import colorize_mask,calAngle
-from tools.warper import order_points,four_point_transform 
+from util import colorize_mask,calAngle,order_points 
 from IPython import embed 
     
 class KeyBoard(object):

@@ -5,10 +5,10 @@ import shutil
 import sys 
 sys.path.insert(0,os.path.realpath('..'))
 sys.path.insert(0,os.path.join(os.path.realpath('..'),'piano_utils'))
-from tools.warper import order_points 
+#from tools.warper import order_points 
 from config import cfg 
 from piano_utils.networks import PSPNet 
-from piano_utils.util import colorize_mask 
+from piano_utils.util import colorize_mask,order_points
 from piano_utils.keyboard import KeyBoard
 from PIL import Image 
 from tqdm import tqdm 

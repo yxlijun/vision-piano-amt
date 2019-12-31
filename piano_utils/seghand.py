@@ -18,7 +18,6 @@ import cv2
 from networks import PSPNet
 from config import cfg 
 from util import colorize_mask
-from tools.warper import * 
 import time 
 from IPython import embed 
 

@@ -6,7 +6,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__)))
 sys.path.append(PROJECT_ROOT)
 
 EXPERMENT_CONFIG = {
-        'on':False,
+        'on':True,
         'alpha':False,
         'network':True  
 }
@@ -34,9 +34,9 @@ _C.VIS_THRESH = 0.7
 # pretained model config
 _C.HAND_MODEL = os.path.join(PROJECT_ROOT,'weights','det_hand.pth')
 #_C.KEY_WHITE_MODEL = './weights/white_key_112_32.pth'
-_C.KEY_BLACK_MODEL = './weights/black_key_112_32.pth'
+#_C.KEY_BLACK_MODEL = './weights/black_key_112_32.pth'
 _C.KEY_WHITE_MODEL = './weights/experments/network/record/white_conv3net.pth'
-#_C.KEY_BLACK_MODEL = './weights/experments/network/black_conv3net.pth'
+_C.KEY_BLACK_MODEL = './weights/experments/network/record/black_conv3net.pth'
 _C.MEAN = [0.45734706, 0.43338275, 0.40058118]
 _C.STD = [0.23965294, 0.23532275, 0.2398498]
 
@@ -66,7 +66,7 @@ else:
 
 ## ['resnet','simple','conv3net']
 _C.WNetStyle = netstyle
-_C.BNetStyle = 'resnet'
+_C.BNetStyle = 'conv3net'
 
 ## hand segment 
 _C.HAND_SEG_MODEL = os.path.join(PROJECT_ROOT,'weights','seg_hand.pth')

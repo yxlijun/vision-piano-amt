@@ -35,7 +35,7 @@ class VisAmtHelper(object):
         
         self.detect_hand = True
         #self.post = True if self.detect_hand else False 
-        self.post_white = True
+        self.post_white = False
         self.post_black = False
         self.type= music_type
 
