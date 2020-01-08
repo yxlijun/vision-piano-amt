@@ -4,6 +4,7 @@ import os
 import time 
 from PIL import Image 
 from config import cfg 
+from IPython import embed 
 
 def vis_bw_key(img,
         white_loc,
@@ -130,7 +131,30 @@ def vis_detect_black_key(img,
             cv2.rectangle(img_copy,box[0],box[1],(0,255,0),hratio)
     return img_copy 
 
-       
+
+def vis_diff_img_key(img,
+                    img_name,
+                    hand_boxes,
+                    white_loc,
+                    black_boxes,
+                    rect):
+    img_copy = img.copy()
+    height,width = img.shape[:2]
+    ratio = width/1920 
+    hratio = int(round(2.2*width/1920))
+    for ind,loc in enumerate(white_loc):
+        if ind ==len(white_loc)-1:
+            break 
+        cv2.putText(img_copy, str(ind + 1), (int(white_loc[ind] + 2), int(0.9*height)), cv2.FONT_HERSHEY_PLAIN, ratio, (0, 0, 255), 1)
+    for ind,box in enumerate(black_boxes):
+        x1,y1,w,h = box
+        cv2.putText(img_copy, str(ind + 1), (int(x1 - 2), int(0.1*height)), cv2.FONT_HERSHEY_PLAIN, ratio, (0, 255, 0), 1)
+    for box in hand_boxes:
+        cv2.rectangle(img_copy,(box[0][0],box[0][1]-rect[1]),(box[1][0],box[1][1]-rect[1]),(0,255,0),hratio)
+    cv2.putText(img_copy,img_name,(30,int(height//4)),cv2.FONT_HERSHEY_SIMPLEX,0.8,(0,0,255),2)
+    return img_copy 
+
+
 def vis_detect_total_key(img,
                         img_name,
                         hand_boxes,
@@ -450,8 +474,8 @@ def update_base_img(base_img,cur_img,white_loc,hand_boxes):
     if len(hand_boxes)>0:
         index_list = near_white(white_loc,hand_boxes)
         for index_pair in index_list:
-            index1 = max(index_pair[0]-2,0)
-            index2 = min(len(white_loc)-1,index_pair[1]+2)
+            index1 = max(index_pair[0],0)
+            index2 = min(len(white_loc)-1,index_pair[1])
             x1,x2 = white_loc[index1],white_loc[index2]
             cur_img_[:,x1:x2] = base_img[:,x1:x2].copy()
     base_img = cur_img_

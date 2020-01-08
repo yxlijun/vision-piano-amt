@@ -35,7 +35,7 @@ class KeyBoard(object):
         self.normalize = transforms.Normalize(cfg.MEAN, cfg.STD)
         self.num_classes = cfg.KEYBOARD_NUM_CLASSES
         self.palette = cfg.KEYBOARD_PALETTE
-
+        
         self.model = PSPNet(num_classes=self.num_classes)
         availble_gpus = list(range(torch.cuda.device_count()))
         self.device = torch.device('cuda:0' if len(availble_gpus) > 0 else 'cpu')

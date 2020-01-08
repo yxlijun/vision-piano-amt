@@ -62,7 +62,7 @@ parser.add_argument('--manualSeed', default=100,type=int, help='manual seed')
 
 parser.add_argument('--type',type=str,default='white',choices=['white','black'])
 
-parser.add_argument('--network',type=str,default='resnet',choices=['simple','resnet','conv3net'])
+parser.add_argument('--network',type=str,default='conv3net',choices=['simple','resnet','conv3net'])
 parser.add_argument('--input_channel',type=int,default=1,choices=[1,3])
 parser.add_argument('--data',type=str,default='owndata',choices=['owndata','paperdata'])
 
@@ -100,7 +100,8 @@ best_acc = 0  # best test accuracy
 def main():
     global best_acc
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
-    start_time = datetime.now().strftime('%m-%d_%H-%M')
+    #start_time = datetime.now().strftime('%m-%d_%H-%M')
+    start_time = datetime.now().strftime('%m-%d_%H')
     
 
     # Data
@@ -136,7 +137,7 @@ def main():
     args.checkpoint = os.path.join(cfg.SAVE_MODEL_DIR,
                                     args.data,args.type,
                                     args.network,'h{}_w{}'.format(input_h,input_w),
-                                    'alpha_{}'.format(alpha))
+                                    'alpha_{}'.format(alpha),start_time)
     if os.path.exists(args.checkpoint):
         shutil.rmtree(args.checkpoint)
     if not os.path.isdir(args.checkpoint):

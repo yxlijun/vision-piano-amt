@@ -8,7 +8,7 @@ plt.rcParams['axes.unicode_minus']=False
 plt.rcParams['figure.figsize'] = (1920, 1080)
 
 cfg = {
-        'save_dir':'/home/data/lj/Piano/saved'
+        'save_dir':'/home/data/lj/Piano/saved/experment/network/conv3net/'
 }
 colors = [
         'r','g','b','darkorange','violet','coral','peru','lightpink','tan','orangered','sage','c','nvay','skyblue','darkred','m'
@@ -18,8 +18,8 @@ class PlotBase(object):
     def __init__(self,plt_path):
         self.init_config(plt_path)
         
-        self.plt_figure_by_light()
-        #self.plt_figure_by_file()
+        #self.plt_figure_by_light()
+        self.plt_figure_by_file()
 
     def init_config(self,plt_path):
         self.plt_marks = list()
@@ -220,7 +220,7 @@ class PlotExp(object):
         pass 
 
 if __name__=='__main__':
-    plt_path = '/home/data/gxdata/Record/1223_2/'
+    plt_path = '/home/data/lj/Piano/test_imgs/Record/1225'
     #plt_path = '/home/data/lj/Piano/paperData/IWSSIP/TestSet/images'
     pltbase = PlotBase(plt_path)
     

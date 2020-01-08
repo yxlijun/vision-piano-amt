@@ -6,7 +6,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__)))
 sys.path.append(PROJECT_ROOT)
 
 EXPERMENT_CONFIG = {
-        'on':True,
+        'on':False,
         'alpha':False,
         'network':True  
 }
@@ -33,10 +33,8 @@ _C.VIS_THRESH = 0.7
 
 # pretained model config
 _C.HAND_MODEL = os.path.join(PROJECT_ROOT,'weights','det_hand.pth')
-#_C.KEY_WHITE_MODEL = './weights/white_key_112_32.pth'
-#_C.KEY_BLACK_MODEL = './weights/black_key_112_32.pth'
-_C.KEY_WHITE_MODEL = './weights/experments/network/record/white_conv3net.pth'
-_C.KEY_BLACK_MODEL = './weights/experments/network/record/black_conv3net.pth'
+_C.KEY_WHITE_MODEL = './weights/experments/network/record/white_conv3net_add_network.pth'
+_C.KEY_BLACK_MODEL = './weights/experments/network/record/black_conv3net_add_network.pth'
 _C.MEAN = [0.45734706, 0.43338275, 0.40058118]
 _C.STD = [0.23965294, 0.23532275, 0.2398498]
 
@@ -57,7 +55,7 @@ _C.KEYBOARD_NUM_CLASSES = 2
 
 ## save file config 
 if not EXPERMENT_CONFIG['on']:
-    _C.SAVE_IMG_DIR = os.path.join('/home/data/lj/Piano','saved')
+    _C.SAVE_IMG_DIR = os.path.join('/home/data/lj/Piano','saved','network')
 else:
     if EXPERMENT_CONFIG['alpha']:
         _C.SAVE_IMG_DIR = os.path.join('/home/data/lj/Piano','saved','experment','alpha','alpha3.0')
@@ -75,6 +73,7 @@ _C.HAND_SEG_NUM_CLASSES = 2
 
 ### vision 
 _C.VISION_DETECT = True 
+_C.UPDATE_BACKGROUND = True 
 
 _C.HAND_LENGTH = 25
 ###evalute

@@ -26,11 +26,6 @@ def img2video(path,size=(1280,720)):
 
 
 def readvideo2flipvideo(video_path,save_path):
-    print(video_path)
-    save_img_dir = os.path.join(os.path.split(save_path)[0],'images',os.path.basename(save_path).split('.')[0])
-    if not os.path.exists(save_img_dir):
-        os.makedirs(save_img_dir)
-    else:return 
     capture = cv2.VideoCapture(video_path)
     if not capture.isOpened():
         raise ValueError('read video wrong')
@@ -38,6 +33,11 @@ def readvideo2flipvideo(video_path,save_path):
     total_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     #print(fps)
     #return 
+    print(video_path)
+    save_img_dir = os.path.join(os.path.split(save_path)[0],'images',os.path.basename(save_path).split('.')[0])
+    if not os.path.exists(save_img_dir):
+        os.makedirs(save_img_dir)
+    else:return 
     size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), 
             int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     fourcc = cv2.VideoWriter_fourcc('m','p','4','v')

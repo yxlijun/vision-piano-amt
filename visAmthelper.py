@@ -33,10 +33,10 @@ class VisAmtHelper(object):
         self.midi_offset = midi_offset 
         
         self.detect_hand = True
-        #self.post = True if self.detect_hand else False 
-        self.post_white = False
-        self.post_black = False
+        self.post_white = True
+        self.post_black = True 
         self.type= music_type
+
 
     def init_model_load(self,white_model=None,black_model=None):
         self.keyboard = KeyBoard()
@@ -132,8 +132,6 @@ class VisAmtHelper(object):
                 base_img = update_base_img(base_img,cur_keyboard_img,white_loc,hand_boxes)
                 base_all_img = opencv_img.copy()
                 continue
-            #if self.count_frame%10==0:
-            #    base_img = update_base_img(base_img,cur_keyboard_img,white_loc,hand_boxes)
             #cv2.imwrite(os.path.join(self.base_img_dir,os.path.basename(img_file)),base_img)
             keypresstimer.tic()
             if self.detect_hand:
@@ -174,8 +172,10 @@ class VisAmtHelper(object):
                                                   total_top,
                                                   total_bottom,
                                                   black_boxes)
-            #cv2.imwrite(os.path.join(self.detect_white_img_dir,os.path.basename(img_file)),save_white_img)
-            #cv2.imwrite(os.path.join(self.detect_black_img_dir,os.path.basename(img_file)),save_black_img)
+            diff_img = vis_diff_img_key(diff_img,os.path.basename(img_file),
+                                        hand_boxes,white_loc,black_boxes,keyboard_rect)
+            # cv2.imwrite(os.path.join(self.detect_white_img_dir,os.path.basename(img_file)),save_white_img)
+            # cv2.imwrite(os.path.join(self.detect_black_img_dir,os.path.basename(img_file)),save_black_img)
             cv2.imwrite(os.path.join(self.detect_total_img_dir,os.path.basename(img_file)),save_total_img)
             cv2.imwrite(os.path.join(self.diff_img_dir,os.path.basename(img_file)),diff_img)
             save_detect_result(white_keys_list, img_file, fwhite, fps)
@@ -183,6 +183,8 @@ class VisAmtHelper(object):
             avgtimer.toc()
             #print('process {} total cost:{:.3}s || hand detect:{:.3}s || keypress:{:.3}s || vis:{:.3}s'.format(os.path.basename(img_file),
             #                                                                    avgtimer.toc(), handetime, keyetime,vistimer.toc()))
+            if self.count_frame%5==0 and cfg.UPDATE_BACKGROUND:
+                base_img = update_base_img(base_img,cur_keyboard_img,white_loc,hand_boxes)
         fwhite.close()
         fblack.close()
         print('avg process time:{:.3}s'.format(avgtimer.elapsed()))
@@ -312,7 +314,8 @@ class VisAmtHelper(object):
         whole_list = list(set(whole_list))
         whole_list.sort()
         detect_white_keys = []
-        white_index_prob_map = dict()
+        white_index_prob_map = dict() 
+         
         if len(whole_list)>0:
             input_imgs = list()
             for index in whole_list:
@@ -370,20 +373,26 @@ class VisAmtHelper(object):
                 press_path = os.path.join(self.press_black_img_dir,'{}_{}.jpg'.format(file_seq,index+1))
                 cv2.imwrite(press_path,crop_img) 
             pred,prob = self.modelproduct.detect_black_keys(input_imgs)
+
             for idx,key_index in enumerate(black_whole_list):
-                if pred[idx]==1:
+                if pred[idx]==1: 
                     if self.post_black:
                         if vertify_press_black(key_index,hand_mask,black_boxes):
                             detect_black_keys.append(key_index+1)
+                            black_index_prob_map[key_index+1] = prob[idx]
                     else:
                         detect_black_keys.append(key_index+1)
                         black_index_prob_map[key_index+1] = prob[idx]
+
+
         for wkey,wprob in white_index_prob_map.items():
             bkeys = self.bw_index_dict[str(wkey)]
             for bkey in bkeys:
                 if bkey in black_index_prob_map.keys():
                     bprob = black_index_prob_map[bkey]
+                    if (wprob-bprob)>10 or (wprob>0.93 and bprob<0.9):
+                        detect_black_keys.remove(bkey)
                     if bprob>0.96 and wprob<0.9:
                         detect_white_keys.remove(wkey)
-                        break
+                        break 
         return detect_white_keys,detect_black_keys,diff_img  

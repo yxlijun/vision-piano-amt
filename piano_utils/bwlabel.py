@@ -232,7 +232,12 @@ class BwLabel(object):
                     if count > (x2-x1)*0.5:
                         black_boxes.append((x1,y1,w,i-y1))
                         break 
-
+        if len(black_boxes)!=36:
+            ws = [box[2] for box in black_boxes]
+            ws = np.array(ws)
+            me = np.median(ws)
+            for i,wd in enumerate(ws):
+                if wd<me*0.5:del black_boxes[i]
         return black_boxes
 
     def key_loc_paper_data(self,base_img):
