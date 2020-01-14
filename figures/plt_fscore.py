@@ -5,7 +5,7 @@ from IPython import embed
 
 plt.rcParams['font.sans-serif']=['SimHei']
 plt.rcParams['axes.unicode_minus']=False 
-plt.rcParams['figure.figsize'] = (1920, 1080)
+#plt.rcParams['figure.figsize'] = (1920, 1080)
 
 cfg = {
         'save_dir':'/home/data/lj/Piano/saved/experment/network/conv3net/'
@@ -156,7 +156,7 @@ class PlotBase(object):
         plt.ylim(0.0, 1)
         plt.gcf().set_facecolor(np.ones(3))
         plt.grid()
-        plt.xlabel('Song')
+        plt.xlabel('VideoSample')
         plt.ylabel('FScore')
         y_ticks = np.arange(0, 1.1, 0.1)
         plt.yticks(y_ticks)
@@ -215,9 +215,6 @@ class PlotBase(object):
                         else:self.note_total_fscore[mark] = val 
 
 
-class PlotExp(object):
-    def __init__(self):
-        pass 
 
 if __name__=='__main__':
     plt_path = '/home/data/lj/Piano/test_imgs/Record/1225'

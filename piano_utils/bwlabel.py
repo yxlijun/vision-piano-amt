@@ -37,7 +37,7 @@ class BwLabel(object):
     def __init__(self):
         super(BwLabel, self).__init__()
 
-    def key_loc(self,base_img):
+    def key_loc(self, base_img):
         white_loc = []
         black_boxes = []
         total_top = []
@@ -54,6 +54,7 @@ class BwLabel(object):
         black_loc = [box[0] for box in black_boxes]
         '''
         ori_img = base_img.copy()
+        draw_img = base_img.copy()
         height,width,_ = ori_img.shape 
         black_boxes,black_loc = self.find_black_boxes(ori_img)
         if len(black_boxes)!=36:
@@ -111,6 +112,7 @@ class BwLabel(object):
                 bottom_box = (white_x + 1, 1.1 * black_boxes[35][3], white_loc[i] - white_x - 1, height - 1.1 * black_boxes[35][3])
                 total_top.append(top_box)
                 total_bottom.append(bottom_box)
+
         white_loc = np.array(white_loc,dtype=np.int32)
         black_boxes = np.array(black_boxes,dtype=np.int32)
         total_top = np.array(total_top,dtype=np.int32)

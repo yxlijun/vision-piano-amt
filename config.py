@@ -41,7 +41,7 @@ _C.STD = [0.23965294, 0.23532275, 0.2398498]
 ## key_config 
 _C.KEY_NUM_CLASSES = 2 
 _C.WHITE_KEY_THRESH = 0.6
-_C.BLACK_KEY_THRESH = 0.6
+_C.BLACK_KEY_THRESH = 0.4
 _C.NEAR_KEY_THRESH = 0.95
 _C.WHITE_INPUT_CHANNEL = 1
 _C.BLACK_INPUT_CHANNEL = 1
@@ -121,6 +121,9 @@ _C.EVALUATE_MAP = {
         '4_left_520':{'start_frame':68,'midi':'/home/data/gxdata/Record/1225/4_left_520.MID','fps':24,'midi_offset':1.5}, 
         '4_left_620':{'start_frame':28,'midi':'/home/data/gxdata/Record/1225/4_left_620.MID','fps':24,'midi_offset':1.5}, 
         '4_left_730':{'start_frame':55,'midi':'/home/data/gxdata/Record/1225/4_left_730.MID','fps':24,'midi_offset':1.5}, 
+
+
+        'level_1_no_2':{'start_frame':0,'midi':'/home/data/gxdata/netTanQinBa/netDataNew/videomidi/level_1_no_2.txt','fps':25,'midi_offset':0}, 
 
 
         'V1':{'start_frame':98,'midi':'/home/data/lj/Piano/paperData/IWSSIP/TestSet/OriginalVideos/V1.wmv.mid','fps':20,'midi_offset':0}, 

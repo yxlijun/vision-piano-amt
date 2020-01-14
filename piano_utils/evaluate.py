@@ -12,9 +12,9 @@ from config import cfg
 
 class Accuracy(object):
     def __init__(self, 
-                midiPath, 
-                w_detectPath, 
-                b_detectPath,
+                midiPath=None, 
+                w_detectPath=None, 
+                b_detectPath=None,
                 pframe_time=0.04,
                 start_frame = 0,
                 midi_offset = 1.5,
@@ -25,27 +25,40 @@ class Accuracy(object):
         self.b_detectPath = b_detectPath
         self.pframe_time = pframe_time 
         self.offTime = start_frame * pframe_time
-        self.pitch_onset = self.processMidi(self.midiPath,self.offTime,midi_offset)  
+
         self.frameOffset = frameOffset  #前面两帧没出现则认为是新的note
         self.tolerance = tolerance  #误差计算误差为2s
-        self.tol_frame = 2
+        self.tol_frame = 0
+        self.midi_offset = midi_offset 
 
         self.black_num = [2, 5, 7, 10, 12, 14, 17, 19, 22, 24, 26, 29,
                           31, 34, 36, 38, 41, 43, 46, 48, 50, 53, 55, 58,
                           60, 62, 65, 67, 70, 72, 74, 77, 79, 82, 84, 86]
         self.white_num = [x for x in range(1, 89) if x not in self.black_num]
-        
-        evalfile = os.path.join(os.path.dirname(w_detectPath),'evalresult.txt')
-        self.evalout = open(evalfile,'w')
-        #self.black_precision()
-        #self.white_precision()
 
-        self.evaluate_frame_precision()
-        self.Total_precision()
-        self.save_midi()
-        self.pitch2note()
-        self.evalout.close()
+        self.run()
     
+    def run(self):
+        if self.midiPath is not None:
+            if self.midiPath.endswith('txt'):
+                self.pitch_onset = self.processMidibytxt(self.midiPath,self.offTime,self.midi_offset) 
+            else:
+                self.pitch_onset = self.processMidi(self.midiPath,self.offTime,self.midi_offset)
+            evalfile = os.path.join(os.path.dirname(self.w_detectPath),'evalresult.txt') 
+            self.evalout = open(evalfile,'w')
+            #self.black_precision()
+            #self.white_precision()
+
+            self.evaluate_frame_precision()
+            self.Total_precision()
+            self.save_midi()
+            self.pitch2note()
+            self.evalout.close()
+        else:
+            self.b_pro_onset=self.processDetect(self.b_detectPath,mode='black')
+            self.w_pro_onset = self.processDetect(self.w_detectPath) 
+            self.pitch2note()
+
     def get_frame_result(self):
         result = {
                 'black':{'precies':self.b_precies,'recall':self.b_recall,'F':self.b_F},
@@ -59,7 +72,22 @@ class Accuracy(object):
                 'white':{'precies':self.notew_precies,'recall':self.notew_recall,'F':self.notew_F}
         }
         return result 
-   
+    
+    def processMidibytxt(self,midiPath,offTime=0,midi_offset=0):
+        with open(midiPath,'r') as fr:
+            items = fr.readlines()
+        self.pitch_onset_offset = []
+        pitch_onset = []
+        for item in items:
+            item = item.strip().split('\t')
+            po = [float(item[0])-midi_offset+offTime,float(item[1])-midi_offset+offTime,int(item[2])]
+            self.pitch_onset_offset.append(po)
+            pitch_onset.append([float(item[0])-midi_offset+offTime,int(item[2])])
+        
+        pitch_onset = sorted(pitch_onset, key=lambda x: (x[0], x[1]))
+        self.pitch_onset_offset = sorted(self.pitch_onset_offset,key=lambda x:(x[0],x[1],x[2]))
+        return pitch_onset 
+
     def processMidi(self, midiPath, offTime, midi_offset):
         mid = mido.MidiFile(midiPath)
         timeCount = 0
@@ -125,13 +153,13 @@ class Accuracy(object):
         with open(whitepath,'w') as fout:
             for po in self.w_pro_onset:
                 count_frame = int(po[0]/self.pframe_time)
-                dat = 'frame{} {:.5} {}\n'.format(count_frame,po[0],po[1])
+                dat = 'frame{} {:.5} {:.5} {}\n'.format(count_frame,po[0],po[2],po[1])
                 fout.write(dat)
 
         with open(blackpath,'w') as fout:
             for po in self.b_pro_onset:
                 count_frame = int(po[0]/self.pframe_time)
-                dat = 'frame{} {:.5} {}\n'.format(count_frame,po[0],po[1])
+                dat = 'frame{} {:.5} {:.5} {}\n'.format(count_frame,po[0],po[2],po[1])
                 fout.write(dat)
 
     def processDetect(self, detectPath,mode='white'):
@@ -174,27 +202,36 @@ class Accuracy(object):
 
                 final_set = sorted(final_set)
                 for pressed_key in final_set:
+                    count = 0
+                    end_frame = i+1
+                    for j in range(i+1,len(times)):
+                        if pressed_key in keys[j]:
+                            count+=1
+                            end_frame = j 
+                        else:break 
                     if mode=='white':
-                        end = min(len(times),i+4)
-                        count = 0
-                        for j in range(i+1,end):
-                            if pressed_key in keys[j]:count+=1
                         if count>=1:
-                            data = [times[i], pressed_key]
+                            data = [times[i], pressed_key,times[end_frame]]
                             pro_onset.append(data)
                     else:
-                        end = min(len(times),i+2)
-                        count = 0
-                        for j in range(i+1,end):
-                            if pressed_key in keys[j]:count+=1
                         if count>=1:
-                            data = [times[i], pressed_key]
+                            data = [times[i], pressed_key,times[end_frame]]
                             pro_onset.append(data)
-        if len(keys)>0:
+        if len(keys)>0 and len(pro_onset)>0:
             for note in keys[0]:
-                pro_onset.append([times[0], note])
+                count = 0
+                end_frame = 1
+                if note==0 or note==pro_onset[0][1]:continue
+                for j in range(1,len(times)):
+                    if note in keys[j]:
+                        count+=1
+                        end_frame = j
+                    else:break 
+                if count>=1:
+                    data = [times[0],note,times[end_frame]]
+                    pro_onset.append(data)
         if len(pro_onset) > 0:
-            pro_onset = sorted(pro_onset, key=lambda x: (x[0], x[1]))
+            pro_onset = sorted(pro_onset, key=lambda x: (x[0], x[1],x[2]))
         return pro_onset
     
     def cal_F(self,recall,precise):
@@ -308,10 +345,11 @@ class Accuracy(object):
         def cal_acc(det_frames,det_keys,midi_frames,midi_keys):
             recall_count = 0 
             precise_count = 0
+            #---相当于是计算帧级的准确率
             for idx,mframe in enumerate(midi_frames):
                 match = False 
                 for idy,dframe in enumerate(det_frames):
-                    if abs(mframe-dframe)<=self.tol_frame and det_keys[idy]==midi_keys[idx]:
+                    if abs(mframe-dframe)<=self.tol_frame and det_keys[idy]==midi_keys[idx]:  
                         match = True 
                 if match:recall_count+=1
             for idx,dframe in enumerate(det_frames):
@@ -326,7 +364,7 @@ class Accuracy(object):
                 precise = precise_count/len(det_frames)
             if len(midi_frames)>0:
                 recall = recall_count/len(midi_frames)
-
+            print(precise_count,len(det_frames),recall_count,len(midi_frames))
             F = self.cal_F(recall,precise)
             return precise,recall,F 
 
@@ -372,7 +410,8 @@ if __name__ == '__main__':
     #eval_record = ['2_baseline','2_right_280','2_right_400','2_right_520','2_right_630','2_right_730']
     #eval_record = ['3_middle_260','3_middle_400','3_middle_530','3_middle_690','3_middle_800']
     #eval_record = ['4_left_240','4_left_390','4_left_520','4_left_620','4_left_730']
-    eval_record = ['middle_140','middle_280','middle_400','middle_510','middle_600','3_middle_260','3_middle_400','3_middle_530','3_middle_690','3_middle_800']
+    #eval_record = ['middle_140','middle_280','middle_400','middle_510','middle_600','3_middle_260','3_middle_400','3_middle_530','3_middle_690','3_middle_800']
+    eval_record = ['level_1_no_2']
     W_frame_recall,W_frame_precies,W_frame_F = 0,0,0
     B_frame_recall,B_frame_priecies,B_frame_F = 0,0,0
     W_note_recall,W_note_precies,W_note_F = 0,0,0
@@ -381,8 +420,8 @@ if __name__ == '__main__':
     for rec in eval_record:
         if rec in cfg.EVALUATE_MAP.keys():
             print(rec)
-            w_detectPath = '/home/data/lj/Piano/saved/experment/alpha4.0/{}/pitch_white.txt'.format(rec)
-            b_detectPath = '/home/data/lj/Piano/saved/{}/pitch_black.txt'.format(rec)
+            w_detectPath = '/home/data/lj/Piano/saved/network/{}/pitch_white.txt'.format(rec)
+            b_detectPath = '/home/data/lj/Piano/saved/network/{}/pitch_black.txt'.format(rec)
             if not os.path.exists(w_detectPath):continue 
             midiPath = cfg.EVALUATE_MAP[rec]['midi']
             fps = cfg.EVALUATE_MAP[rec]['fps']
@@ -416,4 +455,12 @@ if __name__ == '__main__':
     print('avg frame white\tprecies:{:.2}\trecall:{:.2}\tFscore:{:.2}'.format(W_frame_precies,W_frame_recall,W_frame_F))
     print('avg note black\tprecies:{:.2}\trecall:{:.2}\tFscore:{:.2}'.format(B_note_precies,B_note_recall,B_note_F))
     print('avg note white\tprecies:{:.2}\trecall:{:.2}\tFscore:{:.2}'.format(W_note_precies,W_note_recall,W_note_F))
+    
+    path = '/home/data/lj/Piano/saved/network'
+    dirs = [os.path.join(path,x) for x in os.listdir(path)]
+    for cur_dir in dirs:
+        w_detectPath = os.path.join(cur_dir,'pitch_white.txt')
+        b_detectPath = os.path.join(cur_dir,'pitch_black.txt')
+        if not os.path.exists(w_detectPath):continue 
+        acc = Accuracy(w_detectPath=w_detectPath,b_detectPath=b_detectPath)
 

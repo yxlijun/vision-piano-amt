@@ -447,12 +447,12 @@ def vertify_press_white(key_index,
             if mask[i,xcenter]!=0:
                 count+=1 
         if count>2 and prob<0.8:
-            return False,0 
+            return False,0
     white1,white2 = white_loc[key_index-1],white_loc[key_index]
     for box in hand_boxes:
-        x1,x2 = box[0][0],box[1][0]
-        if (white1<x1 and white2>x1) or (white1>x1 and white2<x2) or (white1<x2 and white2>x2):
-            return True,0 
+        x1,x2 = box[0][0]-10,box[1][0]+10
+        if (white1<=x1 and white2>=x1) or (white1>=x1 and white2<=x2) or (white1<=x2 and white2>=x2):
+            return True,0
     return False,0
 
 
@@ -611,6 +611,19 @@ def find_video_base_img(keyboard_model,
                 return result 
     capture.release()
     return result 
+
+
+def save_prob_file(wpath,bpath,wprobs,bprobs):
+    def save(path,probs):
+        fout = open(path,'w')
+        for items in probs:
+            for item in items:
+                data = '{:.3}\t'.format(float(item))
+                fout.write(data)
+            fout.write('\n')
+        fout.close()
+    save(wpath,wprobs)
+    save(bpath,bprobs)
 
 if __name__=='__main__':
     index_dict = black_white_index_dict()

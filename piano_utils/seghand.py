@@ -71,7 +71,7 @@ class SegHand(object):
                 prediction = self.model(input.to(self.device)).squeeze(0)
                 prediction = F.softmax(prediction, dim=0).argmax(0).cpu().numpy()
 
-            self.hand_box,mask = self.post_process(image,prediction,rect)
+            self.hand_box, mask = self.post_process(image, prediction, rect)
             self.mask = np.zeros((height,width))
             self.mask[cropy1:cropy2,cropx1:cropx2] = mask 
             return self.hand_box,self.mask

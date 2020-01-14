@@ -36,7 +36,7 @@ class VisAmtHelper(object):
         self.post_white = True
         self.post_black = True 
         self.type= music_type
-
+        
 
     def init_model_load(self,white_model=None,black_model=None):
         self.keyboard = KeyBoard()
@@ -58,7 +58,18 @@ class VisAmtHelper(object):
         self.videoPath = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'{}.mp4'.format(file_mark))
 
         self.bw_index_dict = black_white_index_dict()
-    
+
+        self.white_prob_map = []
+        self.black_prob_map = []
+        self.w_probPath = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'prob_white.txt')
+        self.b_probPath = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'prob_black.txt')
+        
+        w_detprob_path = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'det_prob_white.txt')
+        b_detprob_path = os.path.join(cfg.SAVE_IMG_DIR,file_mark,'det_prob_black.txt')
+        
+        self.wout = open(w_detprob_path,'w')
+        self.bout =  open(b_detprob_path,'w')
+
     def eval(self,fps):
         self.frame_result = None
         self.note_result = None 
@@ -190,6 +201,10 @@ class VisAmtHelper(object):
         print('avg process time:{:.3}s'.format(avgtimer.elapsed()))
         self.eval(fps)
         #img2video(self.detect_total_img_dir,self.videoPath)
+        save_prob_file(self.w_probPath,self.b_probPath,self.white_prob_map,self.black_prob_map)
+        self.wout.close()
+        self.bout.close()
+
 
     def process_video(self,video_file):
         capture = cv2.VideoCapture(video_file)
@@ -315,7 +330,13 @@ class VisAmtHelper(object):
         whole_list.sort()
         detect_white_keys = []
         white_index_prob_map = dict() 
-         
+        
+        wprob_map = [0 for x in range(53)]
+        bprob_map = [0 for x in range(36)] 
+
+        self.wout.write('{}.jpg\n'.format(file_seq))
+        self.bout.write('{}.jpg\n'.format(file_seq))
+
         if len(whole_list)>0:
             input_imgs = list()
             for index in whole_list:
@@ -328,8 +349,11 @@ class VisAmtHelper(object):
                 input_imgs.append(input_img)
             stime = time.time()
             pred,prob = self.modelproduct.detect_white_keys(input_imgs)
-
+            
             for idx,key_index in enumerate(whole_list):
+                data = '{}\t{:.3}\n'.format(key_index+1,prob[idx])
+                self.wout.write(data)
+                wprob_map[key_index] = prob[idx]
                 if pred[idx]==1:
                     if self.post_white:
                         press,flag = vertify_press_white(key_index+1,hand_mask,self.bw_index_dict,black_boxes,hand_boxes,white_loc,prob[idx])
@@ -375,6 +399,9 @@ class VisAmtHelper(object):
             pred,prob = self.modelproduct.detect_black_keys(input_imgs)
 
             for idx,key_index in enumerate(black_whole_list):
+                data = '{}\t{:.3}\n'.format(key_index+1,prob[idx])
+                self.bout.write(data)
+                bprob_map[key_index] = prob[idx]
                 if pred[idx]==1: 
                     if self.post_black:
                         if vertify_press_black(key_index,hand_mask,black_boxes):
@@ -384,15 +411,16 @@ class VisAmtHelper(object):
                         detect_black_keys.append(key_index+1)
                         black_index_prob_map[key_index+1] = prob[idx]
 
-
         for wkey,wprob in white_index_prob_map.items():
             bkeys = self.bw_index_dict[str(wkey)]
             for bkey in bkeys:
                 if bkey in black_index_prob_map.keys():
                     bprob = black_index_prob_map[bkey]
-                    if (wprob-bprob)>10 or (wprob>0.93 and bprob<0.9):
+                    if (wprob-bprob)>0.15 or (wprob>0.93 and bprob<0.9):
                         detect_black_keys.remove(bkey)
                     if bprob>0.96 and wprob<0.9:
                         detect_white_keys.remove(wkey)
                         break 
+        self.white_prob_map.append(wprob_map)
+        self.black_prob_map.append(bprob_map)
         return detect_white_keys,detect_black_keys,diff_img  
